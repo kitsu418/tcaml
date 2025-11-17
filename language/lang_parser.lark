@@ -1,0 +1,63 @@
+%import common.SIGNED_NUMBER
+%import common.CNAME
+
+%import common.WS
+%ignore WS
+
+number : SIGNED_NUMBER
+bool : /(true|false)/
+ident : CNAME
+measure : delta "->" delta
+
+?prog : def 
+      | def ";" prog
+
+def : "let" "rec"? ident ":" type "=" expr
+    | measure ident ":" delta "->" delta "=" espec
+
+?delta : "()" | "int" | "bool"
+       | delta "*" delta
+       | delta "list"
+       | delta "array"
+
+type : delta
+     | "{" ident ":" delta "|" espec "}"
+     | "(" ident ":" type ")" "->" type "@" cspec
+     | delta "->" delta
+
+cspec : espec
+      | "O(" espec ")"
+
+?espec : ident | number | bool
+       | "not" espec | espec opspec espec
+       | "log" espec
+       | quantifier ident+ "." espec
+       | measure espec
+       | "if" espec "then" espec "else" espec
+       | "(" espec ")"
+
+opspec : "+" | "-" | "*" | "/" | "mod" | "^"
+       | "==" | "<>" | "<" | ">" | "<=" | ">="
+       | "&&" | "||"
+
+quantifier : /(forall|exists)/
+
+?expr : ident | number | bool
+      | "not" expr | expr op expr
+      | "if" expr "then" expr "else" expr
+      | "let" "rec"? ident ":" type "=" expr "in" expr
+      | "fun" "(" ident ":" type ")" "->" expr
+      | expr expr
+      | "[]" | expr "::" expr
+      | "match" expr "with" clauses
+      | "(" expr ")"
+
+?clauses : pat "->" expr ("|" clauses)?
+
+?pat : ident | "_" | number | bool
+     | "[]" | pat "::" pat
+     | "(" pat ")" | "(" pat "," pat ")"
+
+op : "+" | "-" | "*" | "/" | "mod"
+   | "==" | "<>" | "<" | ">" | "<=" | ">="
+   | "&&" | "||"
