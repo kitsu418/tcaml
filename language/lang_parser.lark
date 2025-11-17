@@ -12,8 +12,9 @@ measure : delta "->" delta
 ?prog : def 
       | def ";" prog
 
-def : "let" "rec"? ident ":" type "=" expr
-    | measure ident ":" delta "->" delta "=" espec
+def : funcdef | measuredef
+funcdef : "let" "rec"? ident ":" type "=" expr
+measuredef : "measure" ident ":" delta "->" delta "=" espec
 
 ?delta : "()" | "int" | "bool"
        | delta "*" delta

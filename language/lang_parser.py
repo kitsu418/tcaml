@@ -18,26 +18,36 @@ class TCamlTransformer(Transformer):
         return EBool(tree[0].value == "true")
 
     def ident(self, tree) -> Expr:
-        return EVar(tree[0].value)
+        return EVar(tree[0])
 
     def measure(self, tree) -> Expr:
         left, _, right = tree
         return EMeasure(left, right)
 
-    def prog(self, tree) -> list[Expr]:
-        match tuple(map(lambda x: x.value, tree)):
+    def prog(self, tree: Tree) -> list[Expr]:
+        match tuple(tree):  # type: ignore
             case (defn,):
                 return [defn]
             case (defn, ";", prog):
                 return [defn] + prog
         raise TCamlParserException(f"no match on prog expression {tree}")
 
-    def _def(self, tree) -> Expr:
-        print(tree)
-        return EInt(0)
+    def _def(self, tree) -> tuple[str, Expr]:
+        return tree[0]
+
+    def funcdef(self, tree) -> tuple[str, Expr]:
+        if tree[1].value == "rec":
+            _, _, ident, _, typ, _, body = tree
+        else:
+            _, ident, _, typ, _, body = tree
+        return ident, EFuncDef(typ, body)
+
+    def measuredef(self, tree) -> tuple[str, Expr]:
+        _, ident, _, inp, _, ret, _, body = tree
+        return ident, EMeasureDef(inp, ret, body)
 
     def delta(self, tree) -> DeltaType:
-        match tuple(map(lambda x: x.value, tree)):
+        match tree:
             case ("()",):
                 return DeltaUnit()
             case ("int",):
@@ -51,6 +61,26 @@ class TCamlTransformer(Transformer):
             case (typ, "array"):
                 return DeltaArray(typ)
         raise TCamlParserException(f"no match on delta expression {tree}")
+
+    def _type(self, tree) -> Type:
+        match tree:
+            case (dtype,):
+                return TBase(dtype)
+            case ("{", ident, "L", dtype, "|", espec, "}"):
+                return TRefinement(ident, dtype, espec)
+            case ("(", ident, ":", typ, ")", "->", ret, "@", cspec):
+                return TFunc(ident, typ, ret, cspec)
+            case (inp, "->", ret):
+                return TBaseFunc(inp, ret)
+        raise TCamlParserException(f"no match on type expression {tree}")
+
+    def cspec(self, tree) -> TimeSpec:
+        match tree:
+            case (espec,):
+                return TSExact(espec)
+            case ("O(", espec, ")"):
+                return TSBigO(espec)
+        raise TCamlParserException(f"no match on time expression {tree}")
 
 
 def construct_lark_parser() -> Lark:

@@ -2,14 +2,6 @@ from dataclasses import dataclass
 from enum import Enum
 
 
-class Expr:
-    pass
-
-
-class DeltaType:
-    pass
-
-
 class BinOpKinds(Enum):
     ADD = "+"
     SUB = "-"
@@ -28,6 +20,10 @@ class BinOpKinds(Enum):
 
 
 ## Expressions
+
+
+class Expr:
+    pass
 
 
 @dataclass(frozen=True, slots=True, eq=True)
@@ -56,7 +52,24 @@ class EMeasure(Expr):
     right: EDelta
 
 
-## Delta Types
+@dataclass(frozen=True, slots=True, eq=True)
+class EFuncDef(Expr):
+    typ: Type
+    body: Expr
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class EMeasureDef(Expr):
+    inp: DeltaType
+    ret: DeltaType
+    body: Expr
+
+
+### Delta Types
+
+
+class DeltaType:
+    pass
 
 
 @dataclass(frozen=True, slots=True, eq=True)
@@ -88,3 +101,53 @@ class DeltaList(DeltaType):
 @dataclass(frozen=True, slots=True, eq=True)
 class DeltaArray(DeltaType):
     typ: DeltaType
+
+
+### General types
+
+
+class Type:
+    pass
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class TBase(Type):
+    base: DeltaType
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class TRefinement(Type):
+    ident: str
+    typ: DeltaType
+    spec: Expr
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class TFunc(Type):
+    ident: str
+    typ: Type
+    ret: Type
+    time: Expr
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class TBaseFunc(Type):
+    inp: Type
+    ret: Type
+
+
+# Time specs
+
+
+class TimeSpec:
+    pass
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class TSExact(TimeSpec):
+    spec: Expr
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class TSBigO(TimeSpec):
+    spec: Expr
