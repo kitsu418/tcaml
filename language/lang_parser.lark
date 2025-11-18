@@ -7,43 +7,42 @@
 number : SIGNED_NUMBER
 bool : /(true|false)/
 ident : CNAME
-measure : delta "->" delta
+!measure : delta "->" delta
 
-?prog : def 
+!?prog : def 
       | def ";" prog
 
-def : funcdef | measuredef
-funcdef : "let" "rec"? ident ":" type "=" expr
-measuredef : "measure" ident ":" delta "->" delta "=" espec
+!def : funcdef | measuredef
+!funcdef : "let" "rec"? ident ":" type "=" expr
+!measuredef : "measure" ident ":" delta "->" delta "=" espec
 
-?delta : "()" | "int" | "bool"
+!?delta : "()" | "int" | "bool"
        | delta "*" delta
        | delta "list"
        | delta "array"
 
-type : delta
+!type : delta
      | "{" ident ":" delta "|" espec "}"
      | "(" ident ":" type ")" "->" type "@" cspec
      | delta "->" delta
 
-cspec : espec
+!cspec : espec
       | "O(" espec ")"
 
-?espec : ident | number | bool
+!?espec : ident | number | bool
        | "not" espec | espec opspec espec
        | "log" espec
-       | quantifier ident+ "." espec
+       | "forall" ident+ "." espec
+       | "exists" ident+ "." espec
        | measure espec
        | "if" espec "then" espec "else" espec
        | "(" espec ")"
 
-opspec : "+" | "-" | "*" | "/" | "mod" | "^"
+!opspec : "+" | "-" | "*" | "/" | "mod" | "^"
        | "==" | "<>" | "<" | ">" | "<=" | ">="
        | "&&" | "||"
 
-quantifier : /(forall|exists)/
-
-?expr : ident | number | bool
+!?expr : ident | number | bool
       | "not" expr | expr op expr
       | "if" expr "then" expr "else" expr
       | "let" "rec"? ident ":" type "=" expr "in" expr
@@ -53,12 +52,12 @@ quantifier : /(forall|exists)/
       | "match" expr "with" clauses
       | "(" expr ")"
 
-?clauses : pat "->" expr ("|" clauses)?
+!?clauses : pat "->" expr ("|" clauses)?
 
-?pat : ident | "_" | number | bool
+!?pat : ident | "_" | number | bool
      | "[]" | pat "::" pat
      | "(" pat ")" | "(" pat "," pat ")"
 
-op : "+" | "-" | "*" | "/" | "mod"
+!op : "+" | "-" | "*" | "/" | "mod"
    | "==" | "<>" | "<" | ">" | "<=" | ">="
    | "&&" | "||"

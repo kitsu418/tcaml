@@ -24,8 +24,8 @@ class TCamlTransformer(Transformer):
         left, _, right = tree
         return EMeasure(left, right)
 
-    def prog(self, tree: Tree) -> list[Expr]:
-        match tuple(tree):  # type: ignore
+    def prog(self, tree) -> list[Expr]:
+        match tree:
             case (defn,):
                 return [defn]
             case (defn, ";", prog):
@@ -81,6 +81,118 @@ class TCamlTransformer(Transformer):
             case ("O(", espec, ")"):
                 return TSBigO(espec)
         raise TCamlParserException(f"no match on time expression {tree}")
+
+    def espec(self, tree) -> Spec:
+        match tree:
+            # these are by default turned into expressions, so extract them out
+            case EVar(ident):
+                return SPVar(ident)
+            case EInt(value):
+                return SPInt(value)
+            case EBool(value):
+                return SPBool(value)
+
+            case ("not", body):
+                return SPNot(body)
+            case (left, op, right) if isinstance(op, SPBinOpKinds):
+                return SPBinOp(op, left, right)
+            case ("forall", idents, ".", spec):
+                cur = spec
+                for ident in reversed(idents):
+                    cur = SPForAll(ident, cur)
+                return cur
+            case ("exists", idents, ".", spec):
+                cur = spec
+                for ident in reversed(idents):
+                    cur = SPExists(ident, cur)
+                return cur
+            case (measure, inp):
+                return SPMeasureCall(measure, inp)
+            case ("if", cond, "then", then, "else", els):
+                return SPIte(cond, then, els)
+            case ("(", body, ")"):
+                return body
+        raise TCamlParserException(f"no match on espec expression {tree}")
+
+    def opspec(self, tree) -> SPBinOpKinds:
+        return SPBinOpKinds(tree[0])
+
+    def expr(self, tree) -> Expr:
+        match tree:
+            # these are by default turned into expressions, so extract them out
+            case EVar(_):
+                return tree
+            case EInt(_):
+                return tree
+            case EBool(_):
+                return tree
+
+            case ("not", body):
+                return ENot(body)
+            case (left, op, right) if isinstance(op, EBinOpKinds):
+                return EBinOp(op, left, right)
+            case ("if", cond, "then", then, "else", els):
+                return EIte(cond, then, els)
+            case ("let", ident, ":", typ, "=", value, "in", body) | (
+                "let",
+                "rec",
+                ident,
+                ":",
+                typ,
+                "=",
+                value,
+                "in",
+                body,
+            ):
+                return ELet(ident, typ, value, body)
+            case ("fun", "(", ident, ":", typ, ")", "->", ret):
+                return EFunc(ident, typ, ret)
+            case (func, inp):
+                return EFuncCall(func, inp)
+            case ("[]",):
+                return ENil()
+            case (head, "::", tail):
+                return ECons(head, tail)
+            case ("match", value, "with", clauses):
+                return EMatch(value, clauses)
+            case ("(", body, ")"):
+                return body
+        raise TCamlParserException(f"no match on expr expression {tree}")
+
+    def clauses(self, tree) -> list[Clause]:
+        match tree:
+            case (path, "->", expr):
+                return [Clause(path, expr)]
+            case (path, "->", expr, "|", rest):
+                return [Clause(path, expr)] + rest
+        raise TCamlParserException(f"no match on clauses expression {tree}")
+
+    def pat(self, tree) -> Pattern:
+        match tree:
+            # these are by default turned into expressions, so extract them out
+            case EVar(ident):
+                return PVar(ident)
+            case ("_",):
+                return PAny()
+            case EInt(value):
+                return PInt(value)
+            case EBool(value):
+                return PInt(value)
+
+            case ("[]",):
+                return PNil()
+            case (head, "::", tail):
+                return PCons(head, tail)
+            case ("(", pat, ")"):
+                return pat
+            case ("(", left, ",", right, ")"):
+                return PPair(left, right)
+
+        raise TCamlParserException(f"no match on clauses expression {tree}")
+
+    def op(self, tree) -> EBinOpKinds:
+        print(f'tree is {tree}')
+        return EBinOpKinds(tree[0])
 
 
 def construct_lark_parser() -> Lark:
