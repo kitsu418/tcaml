@@ -10,8 +10,19 @@ from language.lang_parser import parse
         ("1 + 2", "expr", EBinOp(EBinOpKinds("+"), EInt(1), EInt(2))),
         # TODO: implement order precedence
         # ("1 * 2 + 3", EBinOp(EBinOpKinds("*"), EInt(1), (EBinOp(EBinOpKinds('+'), EInt(2), EInt(3))))),
-        # ("(v: int) -> int @ 1", TFunc("v", TBase(DeltaInt()), TBase(DeltaInt()), TSExact(SPInt(1)))),
         ("int", "delta", DeltaInt()),
+        (
+            "(v: int) -> int @ 1",
+            "type",
+            TFunc("v", TBase(DeltaInt()), TBase(DeltaInt()), TSExact(SPInt(1))),
+        ),
+        (
+            "{v: int | v >= 2}",
+            "type",
+            TRefinement(
+                "v", DeltaInt(), SPBinOp(SPBinOpKinds(">="), SPVar("v"), SPInt(2))
+            ),
+        ),
     ],
 )
 def test_parse_exprs(program: str, start: str, expected: Expr) -> None:

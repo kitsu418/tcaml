@@ -1,4 +1,4 @@
-from lark import Lark, Transformer, Tree
+from lark import Lark, Transformer, Token, Tree
 from language.lang import *
 from pathlib import Path
 
@@ -8,9 +8,7 @@ class TCamlParserException(Exception):
 
 
 def get_values(tree) -> tuple:
-    print("values", tree, tuple(tree))
-    return tuple(tree)
-    # return tuple(map(lambda x: x.value, tree))
+    return tuple(map(lambda x: x.value if isinstance(x, Token) else x, tree))
 
 
 class TCamlTransformer(Transformer):
@@ -68,11 +66,11 @@ class TCamlTransformer(Transformer):
                 return DeltaArray(typ)
         raise TCamlParserException(f"no match on delta expression {tree}")
 
-    def _type(self, tree) -> Type:
+    def type(self, tree) -> Type:
         match get_values(tree):
             case (dtype,):
                 return TBase(dtype)
-            case ("{", ident, "L", dtype, "|", espec, "}"):
+            case ("{", ident, ":", dtype, "|", espec, "}"):
                 return TRefinement(ident, dtype, espec)
             case ("(", ident, ":", typ, ")", "->", ret, "@", cspec):
                 return TFunc(ident, typ, ret, cspec)
@@ -191,7 +189,6 @@ class TCamlTransformer(Transformer):
         raise TCamlParserException(f"no match on clauses expression {tree}")
 
     def op(self, tree) -> EBinOpKinds:
-        print(f"tree is {tree}")
         return EBinOpKinds(tree[0])
 
 
@@ -201,7 +198,6 @@ def construct_lark_parser(start: str) -> Lark:
 
 
 def parse_lark_repr(tree: Tree) -> Expr:
-    print(tree)
     transformer = TCamlTransformer()
     result_tree = transformer.transform(tree)
     return result_tree

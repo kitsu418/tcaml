@@ -190,7 +190,7 @@ class TBase(Type):
 class TRefinement(Type):
     ident: str
     typ: DeltaType
-    spec: Expr
+    spec: Spec
 
 
 @dataclass(frozen=True, slots=True, eq=True)
