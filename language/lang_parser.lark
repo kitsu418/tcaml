@@ -9,14 +9,14 @@ bool : /(true|false)/
 ident : CNAME
 !measure : delta "->" delta
 
-!?prog : def 
+!prog : def 
       | def ";" prog
 
 !def : funcdef | measuredef
 !funcdef : "let" "rec"? ident ":" type "=" expr
 !measuredef : "measure" ident ":" delta "->" delta "=" espec
 
-!?delta : "()" | "int" | "bool"
+!delta : "()" | "int" | "bool"
        | delta "*" delta
        | delta "list"
        | delta "array"
@@ -29,7 +29,7 @@ ident : CNAME
 !cspec : espec
       | "O(" espec ")"
 
-!?espec : ident | number | bool
+!espec : ident | number | bool
        | "not" espec | espec opspec espec
        | "log" espec
        | "forall" ident+ "." espec
@@ -42,7 +42,7 @@ ident : CNAME
        | "==" | "<>" | "<" | ">" | "<=" | ">="
        | "&&" | "||"
 
-!?expr : ident | number | bool
+!expr : ident | number | bool
       | "not" expr | expr op expr
       | "if" expr "then" expr "else" expr
       | "let" "rec"? ident ":" type "=" expr "in" expr
@@ -52,9 +52,9 @@ ident : CNAME
       | "match" expr "with" clauses
       | "(" expr ")"
 
-!?clauses : pat "->" expr ("|" clauses)?
+!clauses : pat "->" expr ("|" clauses)?
 
-!?pat : ident | "_" | number | bool
+!pat : ident | "_" | number | bool
      | "[]" | pat "::" pat
      | "(" pat ")" | "(" pat "," pat ")"
 

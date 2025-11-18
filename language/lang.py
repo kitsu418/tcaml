@@ -198,7 +198,7 @@ class TFunc(Type):
     ident: str
     typ: Type
     ret: Type
-    time: Expr
+    time: TimeSpec
 
 
 @dataclass(frozen=True, slots=True, eq=True)
@@ -289,12 +289,12 @@ class SPIte(Spec):
 
 @dataclass(frozen=True, slots=True, eq=True)
 class TSExact(TimeSpec):
-    spec: Expr
+    spec: Spec
 
 
 @dataclass(frozen=True, slots=True, eq=True)
 class TSBigO(TimeSpec):
-    spec: Expr
+    spec: Spec
 
 
 # Clauses and Patterns

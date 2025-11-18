@@ -1,4 +1,4 @@
-from lark import Lark, Token, Transformer, Tree
+from lark import Lark, Transformer, Tree
 from language.lang import *
 from pathlib import Path
 
@@ -7,25 +7,31 @@ class TCamlParserException(Exception):
     pass
 
 
+def get_values(tree) -> tuple:
+    print("values", tree, tuple(tree))
+    return tuple(tree)
+    # return tuple(map(lambda x: x.value, tree))
+
+
 class TCamlTransformer(Transformer):
     def __init__(self):
         super(Transformer).__init__()
 
-    def number(self, tree) -> Expr:
-        return EInt(int(tree[0].value))
+    def number(self, tree) -> int:
+        return int(tree[0].value)
 
-    def bool(self, tree) -> Expr:
-        return EBool(tree[0].value == "true")
+    def bool(self, tree) -> bool:
+        return tree[0].value == "true"
 
-    def ident(self, tree) -> Expr:
-        return EVar(tree[0])
+    def ident(self, tree) -> str:
+        return tree[0]
 
     def measure(self, tree) -> Expr:
         left, _, right = tree
         return EMeasure(left, right)
 
     def prog(self, tree) -> list[Expr]:
-        match tree:
+        match get_values(tree):
             case (defn,):
                 return [defn]
             case (defn, ";", prog):
@@ -47,7 +53,7 @@ class TCamlTransformer(Transformer):
         return ident, EMeasureDef(inp, ret, body)
 
     def delta(self, tree) -> DeltaType:
-        match tree:
+        match get_values(tree):
             case ("()",):
                 return DeltaUnit()
             case ("int",):
@@ -63,7 +69,7 @@ class TCamlTransformer(Transformer):
         raise TCamlParserException(f"no match on delta expression {tree}")
 
     def _type(self, tree) -> Type:
-        match tree:
+        match get_values(tree):
             case (dtype,):
                 return TBase(dtype)
             case ("{", ident, "L", dtype, "|", espec, "}"):
@@ -75,7 +81,7 @@ class TCamlTransformer(Transformer):
         raise TCamlParserException(f"no match on type expression {tree}")
 
     def cspec(self, tree) -> TimeSpec:
-        match tree:
+        match get_values(tree):
             case (espec,):
                 return TSExact(espec)
             case ("O(", espec, ")"):
@@ -83,15 +89,13 @@ class TCamlTransformer(Transformer):
         raise TCamlParserException(f"no match on time expression {tree}")
 
     def espec(self, tree) -> Spec:
-        match tree:
-            # these are by default turned into expressions, so extract them out
-            case EVar(ident):
+        match get_values(tree):
+            case (ident,) if isinstance(ident, str):
                 return SPVar(ident)
-            case EInt(value):
+            case (value,) if isinstance(value, int):
                 return SPInt(value)
-            case EBool(value):
+            case (value,) if isinstance(value, bool):
                 return SPBool(value)
-
             case ("not", body):
                 return SPNot(body)
             case (left, op, right) if isinstance(op, SPBinOpKinds):
@@ -118,15 +122,13 @@ class TCamlTransformer(Transformer):
         return SPBinOpKinds(tree[0])
 
     def expr(self, tree) -> Expr:
-        match tree:
-            # these are by default turned into expressions, so extract them out
-            case EVar(_):
-                return tree
-            case EInt(_):
-                return tree
-            case EBool(_):
-                return tree
-
+        match get_values(tree):
+            case (ident,) if isinstance(ident, str):
+                return EVar(ident)
+            case (value,) if isinstance(value, int):
+                return EInt(value)
+            case (value,) if isinstance(value, bool):
+                return EBool(value)
             case ("not", body):
                 return ENot(body)
             case (left, op, right) if isinstance(op, EBinOpKinds):
@@ -160,7 +162,7 @@ class TCamlTransformer(Transformer):
         raise TCamlParserException(f"no match on expr expression {tree}")
 
     def clauses(self, tree) -> list[Clause]:
-        match tree:
+        match get_values(tree):
             case (path, "->", expr):
                 return [Clause(path, expr)]
             case (path, "->", expr, "|", rest):
@@ -168,17 +170,15 @@ class TCamlTransformer(Transformer):
         raise TCamlParserException(f"no match on clauses expression {tree}")
 
     def pat(self, tree) -> Pattern:
-        match tree:
-            # these are by default turned into expressions, so extract them out
-            case EVar(ident):
+        match get_values(tree):
+            case (ident,) if isinstance(ident, str):
                 return PVar(ident)
             case ("_",):
                 return PAny()
-            case EInt(value):
+            case (value,) if isinstance(value, int):
                 return PInt(value)
-            case EBool(value):
-                return PInt(value)
-
+            case (value,) if isinstance(value, bool):
+                return PBool(value)
             case ("[]",):
                 return PNil()
             case (head, "::", tail):
@@ -191,21 +191,24 @@ class TCamlTransformer(Transformer):
         raise TCamlParserException(f"no match on clauses expression {tree}")
 
     def op(self, tree) -> EBinOpKinds:
-        print(f'tree is {tree}')
+        print(f"tree is {tree}")
         return EBinOpKinds(tree[0])
 
 
-def construct_lark_parser() -> Lark:
+def construct_lark_parser(start: str) -> Lark:
     with open(Path(__file__).parent.absolute() / "lang_parser.lark", "r") as f:
-        return Lark(f, start="expr")
+        return Lark(f, start=start)
 
 
 def parse_lark_repr(tree: Tree) -> Expr:
+    print(tree)
     transformer = TCamlTransformer()
     result_tree = transformer.transform(tree)
     return result_tree
 
 
-def parse(text: str) -> Expr:
-    parser = construct_lark_parser()
+def parse(text: str, start: str | None = None) -> Expr:
+    if start is None:
+        start = "prog"
+    parser = construct_lark_parser(start)
     return parse_lark_repr(parser.parse(text))
