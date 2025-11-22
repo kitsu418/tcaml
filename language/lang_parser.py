@@ -25,6 +25,16 @@ def is_cname(ident: Any) -> bool:
     return False
 
 
+def is_ebinop(op: Any) -> bool:
+    if isinstance(op, str):
+        try:
+            _ = EBinOpKinds(op)
+            return True
+        except:
+            return False
+    return False
+
+
 class TCamlTransformer(Transformer):
     def __init__(self):
         super(Transformer).__init__()
@@ -143,8 +153,9 @@ class TCamlTransformer(Transformer):
                 return EBool(value)
             case ("not", body):
                 return ENot(body)
-            case (left, op, right) if isinstance(op, EBinOpKinds):
-                return EBinOp(op, left, right)
+            case (left, op, right) if is_ebinop(op):
+                print("in here")
+                return EBinOp(EBinOpKinds(op), left, right)
             case ("if", cond, "then", then, "else", els):
                 return EIte(cond, then, els)
             case ("let", ident, ":", typ, "=", value, "in", body) | (
@@ -171,7 +182,18 @@ class TCamlTransformer(Transformer):
                 return EMatch(value, clauses)
             case ("(", body, ")"):
                 return body
+            case (val,):
+                return val
         raise TCamlParserException(f"no match on expr expression {tree}")
+
+    expr0 = expr
+    expr1 = expr
+    expr2 = expr
+    expr3 = expr
+    expr4 = expr
+    expr5 = expr
+    expr6 = expr
+    expr7 = expr
 
     def clauses(self, tree) -> list[Clause]:
         match get_values(tree):

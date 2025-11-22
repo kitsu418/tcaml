@@ -43,7 +43,7 @@ ident : CNAME
        | "&&" | "||"
 
 !expr : ident | number | bool
-      | "not" expr | expr op expr
+      | "not" expr | expr7
       | "if" expr "then" expr "else" expr
       | "let" "rec"? ident ":" type "=" expr "in" expr
       | "fun" "(" ident ":" type ")" "->" expr
@@ -51,6 +51,38 @@ ident : CNAME
       | "[]" | expr "::" expr
       | "match" expr "with" clauses
       | "(" expr ")"
+
+!?expr0 : expr0 expr
+        | expr
+
+!?expr1 : expr0 "^" expr1
+        | expr0
+
+!?expr2 : expr2 "*" expr1
+        | expr2 "/" expr1
+        | expr2 "mod" expr1
+        | expr1
+
+!?expr3 : expr3 "+" expr2
+        | expr3 "-" expr2
+        | expr2
+
+!?expr4 : expr3 "::" expr4
+        | expr3
+
+!?expr5 : expr5 "=" expr4
+        | expr5 "<>" expr4
+        | expr5 "<" expr4
+        | expr5 ">" expr4
+        | expr5 "<=" expr4
+        | expr5 ">=" expr4
+        | expr4
+
+!?expr6 : expr6 "&&" expr5
+        | expr5
+
+!?expr7 : expr7 "||" expr6
+        | expr6
 
 !clauses : pat "->" expr ("|" clauses)?
 

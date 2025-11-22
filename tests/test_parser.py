@@ -34,6 +34,11 @@ from language.lang_parser import parse
                 ],
             ),
         ),
+        (
+            "1 :: (2 + 3) :: []",
+            "expr",
+            ECons(EInt(1), ECons(EBinOp(EBinOpKinds("+"), EInt(2), EInt(3)), ENil())),
+        ),
     ],
 )
 def test_parse_exprs(program: str, start: str, expected: Expr) -> None:
