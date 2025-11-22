@@ -23,6 +23,17 @@ from language.lang_parser import parse
                 "v", DeltaInt(), SPBinOp(SPBinOpKinds(">="), SPVar("v"), SPInt(2))
             ),
         ),
+        (
+            "match xs with [] -> 0 | _ -> 1",
+            "expr",
+            EMatch(
+                EVar("xs"),
+                [
+                    Clause(PNil(), EInt(0)),
+                    Clause(PAny(), EInt(1)),
+                ],
+            ),
+        ),
     ],
 )
 def test_parse_exprs(program: str, start: str, expected: Expr) -> None:

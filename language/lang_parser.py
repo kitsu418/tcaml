@@ -1,6 +1,7 @@
 from lark import Lark, Transformer, Token, Tree
 from language.lang import *
 from pathlib import Path
+from typing import Any
 
 
 class TCamlParserException(Exception):
@@ -9,6 +10,19 @@ class TCamlParserException(Exception):
 
 def get_values(tree) -> tuple:
     return tuple(map(lambda x: x.value if isinstance(x, Token) else x, tree))
+
+
+def is_cname(ident: Any) -> bool:
+    if isinstance(ident, str):
+        if not ident or ident == "_":
+            return False
+        if ident[0] != "_" and not ident[0].isalpha():
+            return False
+        for c in ident[1:]:
+            if c != "_" and not c.isalnum():
+                return False
+        return True
+    return False
 
 
 class TCamlTransformer(Transformer):
@@ -88,7 +102,7 @@ class TCamlTransformer(Transformer):
 
     def espec(self, tree) -> Spec:
         match get_values(tree):
-            case (ident,) if isinstance(ident, str):
+            case (ident,) if is_cname(ident):
                 return SPVar(ident)
             case (value,) if isinstance(value, int):
                 return SPInt(value)
@@ -121,7 +135,7 @@ class TCamlTransformer(Transformer):
 
     def expr(self, tree) -> Expr:
         match get_values(tree):
-            case (ident,) if isinstance(ident, str):
+            case (ident,) if is_cname(ident):
                 return EVar(ident)
             case (value,) if isinstance(value, int):
                 return EInt(value)
@@ -169,7 +183,7 @@ class TCamlTransformer(Transformer):
 
     def pat(self, tree) -> Pattern:
         match get_values(tree):
-            case (ident,) if isinstance(ident, str):
+            case (ident,) if is_cname(ident):
                 return PVar(ident)
             case ("_",):
                 return PAny()
