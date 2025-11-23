@@ -203,8 +203,8 @@ class TFunc(Type):
 
 @dataclass(frozen=True, slots=True, eq=True)
 class TBaseFunc(Type):
-    inp: Type
-    ret: Type
+    inp: DeltaType
+    ret: DeltaType
 
 
 # Mathematical specifications

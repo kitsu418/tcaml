@@ -44,6 +44,18 @@ from language.lang_parser import parse
             "expr",
             ECons(EInt(1), ECons(EBinOp(EBinOpKinds("+"), EInt(2), EInt(3)), ENil())),
         ),
+        (
+            "let rec f : (x: int) -> int @ O(1) = fun (x: int) -> x + 1 in f 1",
+            "expr",
+            ELet(
+                "f",
+                TFunc("x", TBase(DeltaInt()), TBase(DeltaInt()), TSBigO(SPInt(1))),
+                EFunc(
+                    "x", TBase(DeltaInt()), EBinOp(EBinOpKinds("+"), EVar("x"), EInt(1))
+                ),
+                EFuncCall(EVar("f"), EInt(1)),
+            ),
+        ),
     ],
 )
 def test_parse_exprs(program: str, start: str, expected: Expr) -> None:
