@@ -143,7 +143,8 @@ class TCamlTransformer(Transformer):
     def opspec(self, tree) -> SPBinOpKinds:
         return SPBinOpKinds(tree[0])
 
-    def expr(self, tree) -> Expr:
+    def expr_parser(self, tree) -> Expr:
+        print(get_values(tree))
         match get_values(tree):
             case (ident,) if is_cname(ident):
                 return EVar(ident)
@@ -154,7 +155,6 @@ class TCamlTransformer(Transformer):
             case ("not", body):
                 return ENot(body)
             case (left, op, right) if is_ebinop(op):
-                print("in here")
                 return EBinOp(EBinOpKinds(op), left, right)
             case ("if", cond, "then", then, "else", els):
                 return EIte(cond, then, els)
@@ -186,14 +186,16 @@ class TCamlTransformer(Transformer):
                 return val
         raise TCamlParserException(f"no match on expr expression {tree}")
 
-    expr0 = expr
-    expr1 = expr
-    expr2 = expr
-    expr3 = expr
-    expr4 = expr
-    expr5 = expr
-    expr6 = expr
-    expr7 = expr
+    expr_init = expr_parser
+    expr0 = expr_parser
+    expr1 = expr_parser
+    expr2 = expr_parser
+    expr3 = expr_parser
+    expr4 = expr_parser
+    expr5 = expr_parser
+    expr6 = expr_parser
+    expr7 = expr_parser
+    expr8 = expr_parser
 
     def clauses(self, tree) -> list[Clause]:
         match get_values(tree):
@@ -234,6 +236,7 @@ def construct_lark_parser(start: str) -> Lark:
 
 
 def parse_lark_repr(tree: Tree) -> Expr:
+    print(tree)
     transformer = TCamlTransformer()
     result_tree = transformer.transform(tree)
     return result_tree

@@ -8,8 +8,13 @@ from language.lang_parser import parse
     [
         ("1", "expr", EInt(1)),
         ("1 + 2", "expr", EBinOp(EBinOpKinds("+"), EInt(1), EInt(2))),
-        # TODO: implement order precedence
-        # ("1 * 2 + 3", EBinOp(EBinOpKinds("*"), EInt(1), (EBinOp(EBinOpKinds('+'), EInt(2), EInt(3))))),
+        (
+            "1 * 2 + 3",
+            "expr",
+            EBinOp(
+                EBinOpKinds("+"), EBinOp(EBinOpKinds("*"), EInt(1), EInt(2)), EInt(3)
+            ),
+        ),
         ("int", "delta", DeltaInt()),
         (
             "(v: int) -> int @ 1",

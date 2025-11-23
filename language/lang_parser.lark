@@ -42,18 +42,15 @@ ident : CNAME
        | "==" | "<>" | "<" | ">" | "<=" | ">="
        | "&&" | "||"
 
-!expr : ident | number | bool
-      | "not" expr | expr7
-      | "if" expr "then" expr "else" expr
-      | "let" "rec"? ident ":" type "=" expr "in" expr
-      | "fun" "(" ident ":" type ")" "->" expr
-      | expr expr
-      | "[]" | expr "::" expr
-      | "match" expr "with" clauses
-      | "(" expr ")"
+?expr : expr8
 
-!?expr0 : expr0 expr
-        | expr
+!expr_init : ident | number | bool | "[]"
+            | "(" expr ")"
+
+!?expr0 : expr0 expr_init
+        | "not" expr_init
+        | "(" expr ")"
+        | expr_init
 
 !?expr1 : expr0 "^" expr1
         | expr0
@@ -84,12 +81,14 @@ ident : CNAME
 !?expr7 : expr7 "||" expr6
         | expr6
 
+!?expr8 : "if" expr8 "then" expr8 "else" expr8
+       | "let" "rec"? ident ":" type "=" expr8 "in" expr8
+       | "fun" "(" ident ":" type ")" "->" expr8
+       | "match" expr8 "with" clauses
+       | expr7
+
 !clauses : pat "->" expr ("|" clauses)?
 
 !pat : ident | "_" | number | bool
      | "[]" | pat "::" pat
      | "(" pat ")" | "(" pat "," pat ")"
-
-!op : "+" | "-" | "*" | "/" | "mod"
-   | "==" | "<>" | "<" | ">" | "<=" | ">="
-   | "&&" | "||"
