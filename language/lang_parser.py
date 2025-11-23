@@ -65,10 +65,12 @@ class TCamlTransformer(Transformer):
 
     def funcdef(self, tree) -> tuple[str, Expr]:
         if tree[1].value == "rec":
+            rec = True
             _, _, ident, _, typ, _, body = tree
         else:
+            rec = False
             _, ident, _, typ, _, body = tree
-        return ident, EFuncDef(typ, body)
+        return ident, EFuncDef(rec, typ, body)
 
     def measuredef(self, tree) -> tuple[str, Expr]:
         _, ident, _, inp, _, ret, _, body = tree
@@ -158,7 +160,9 @@ class TCamlTransformer(Transformer):
                 return EBinOp(EBinOpKinds(op), left, right)
             case ("if", cond, "then", then, "else", els):
                 return EIte(cond, then, els)
-            case ("let", ident, ":", typ, "=", value, "in", body) | (
+            case ("let", ident, ":", typ, "=", value, "in", body):
+                return ELet(False, ident, typ, value, body)
+            case (
                 "let",
                 "rec",
                 ident,
@@ -169,7 +173,7 @@ class TCamlTransformer(Transformer):
                 "in",
                 body,
             ):
-                return ELet(ident, typ, value, body)
+                return ELet(True, ident, typ, value, body)
             case ("fun", "(", ident, ":", typ, ")", "->", ret):
                 return EFunc(ident, typ, ret)
             case (func, inp):

@@ -48,6 +48,7 @@ from language.lang_parser import parse
             "let rec f : (x: int) -> int @ O(1) = fun (x: int) -> x + 1 in f 1",
             "expr",
             ELet(
+                True,
                 "f",
                 TFunc("x", TBase(DeltaInt()), TBase(DeltaInt()), TSBigO(SPInt(1))),
                 EFunc(

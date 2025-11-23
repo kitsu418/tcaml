@@ -76,6 +76,7 @@ class EMeasure(Expr):
 
 @dataclass(frozen=True, slots=True, eq=True)
 class EFuncDef(Expr):
+    rec: bool
     typ: Type
     body: Expr
 
@@ -108,6 +109,7 @@ class EIte(Expr):
 
 @dataclass(frozen=True, slots=True, eq=True)
 class ELet(Expr):
+    rec: bool
     ident: str
     typ: Type
     value: Expr
