@@ -57,6 +57,22 @@ from language.lang_parser import parse
                 EFuncCall(EVar("f"), EInt(1)),
             ),
         ),
+        (
+            "forall a b . exists x y . a = x",
+            "espec",
+            SPForAll(
+                "a",
+                SPForAll(
+                    "b",
+                    SPExists(
+                        "x",
+                        SPExists(
+                            "y", SPBinOp(SPBinOpKinds("="), SPVar("a"), SPVar("x"))
+                        ),
+                    ),
+                ),
+            ),
+        ),
     ],
 )
 def test_parse_exprs(program: str, start: str, expected: Expr) -> None:

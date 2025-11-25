@@ -35,6 +35,16 @@ def is_ebinop(op: Any) -> bool:
     return False
 
 
+def is_spbinop(op: Any) -> bool:
+    if isinstance(op, str):
+        try:
+            _ = SPBinOpKinds(op)
+            return True
+        except:
+            return False
+    return False
+
+
 class TCamlTransformer(Transformer):
     def __init__(self):
         super(Transformer).__init__()
@@ -47,6 +57,9 @@ class TCamlTransformer(Transformer):
 
     def ident(self, tree) -> str:
         return tree[0]
+
+    def idents(self, tree) -> list[str]:
+        return [x.value for x in tree]
 
     def measure(self, tree) -> Expr:
         left, _, right = tree
@@ -112,8 +125,9 @@ class TCamlTransformer(Transformer):
                 return TSBigO(espec)
         raise TCamlParserException(f"no match on time expression {tree}")
 
-    def espec(self, tree) -> Spec:
-        match get_values(tree):
+    def espec_parser(self, tree) -> Spec:
+        vals = get_values(tree)
+        match vals:
             case (ident,) if is_cname(ident):
                 return SPVar(ident)
             case (value,) if isinstance(value, int):
@@ -122,15 +136,17 @@ class TCamlTransformer(Transformer):
                 return SPBool(value)
             case ("not", body):
                 return SPNot(body)
-            case (left, op, right) if isinstance(op, SPBinOpKinds):
-                return SPBinOp(op, left, right)
+            case (left, op, right) if is_spbinop(op):
+                return SPBinOp(SPBinOpKinds(op), left, right)
             case ("forall", idents, ".", spec):
                 cur = spec
+                print("here", idents)
                 for ident in reversed(idents):
                     cur = SPForAll(ident, cur)
                 return cur
             case ("exists", idents, ".", spec):
                 cur = spec
+                print("here", idents)
                 for ident in reversed(idents):
                     cur = SPExists(ident, cur)
                 return cur
@@ -140,10 +156,25 @@ class TCamlTransformer(Transformer):
                 return SPIte(cond, then, els)
             case ("(", body, ")"):
                 return body
+
+        if vals and vals[0] == "forall":
+            dot_idx = vals.index(".")
+            if dot_idx != -1 and dot_idx + 1 < len(vals):
+                idents = vals[1:dot_idx]
+                # spec = vals[
         raise TCamlParserException(f"no match on espec expression {tree}")
 
-    def opspec(self, tree) -> SPBinOpKinds:
-        return SPBinOpKinds(tree[0])
+    espec_init = espec_parser
+    espec0 = espec_parser
+    espec1 = espec_parser
+    espec2 = espec_parser
+    espec3 = espec_parser
+    espec4 = espec_parser
+    espec5 = espec_parser
+    espec6 = espec_parser
+    espec7 = espec_parser
+    espec8 = espec_parser
+    espec9 = espec_parser
 
     def expr_parser(self, tree) -> Expr:
         print(get_values(tree))

@@ -7,6 +7,7 @@
 number : SIGNED_NUMBER
 bool : /(true|false)/
 ident : CNAME
+idents : ident+
 !measure : delta "->" delta
 
 !prog : def 
@@ -29,18 +30,50 @@ ident : CNAME
 !cspec : espec
       | "O(" espec ")"
 
-!espec : ident | number | bool
-       | "not" espec | espec opspec espec
-       | "log" espec
-       | "forall" ident+ "." espec
-       | "exists" ident+ "." espec
-       | measure espec
-       | "if" espec "then" espec "else" espec
-       | "(" espec ")"
+?espec : espec9
 
-!opspec : "+" | "-" | "*" | "/" | "mod" | "^"
-       | "==" | "<>" | "<" | ">" | "<=" | ">="
-       | "&&" | "||"
+!espec_init : ident | number | bool
+            | "(" expr_init ")"
+
+!?espec0 : measure espec_init
+         | "not" espec_init
+         | "log" espec_init
+         | espec_init
+
+!?espec1 : espec0 "^" espec1
+         | espec0
+
+!?espec2 : espec2 "*" espec1
+         | espec2 "/" espec1
+         | espec2 "mod" espec1
+         | espec1
+
+!?espec3 : espec3 "+" espec2
+         | espec3 "-" espec2
+         | espec2
+
+!?espec4 : espec3
+
+!?espec5 : espec5 "=" espec4
+         | espec5 "<>" espec4
+         | espec5 "<" espec4
+         | espec5 ">" espec4
+         | espec5 "<=" espec4
+         | espec5 ">=" espec4
+         | espec4
+
+!?espec6 : espec6 "&&" espec5
+         | espec5
+
+!?espec7 : espec7 "||" espec6
+         | espec6
+
+!?espec8 : "forall" idents "." espec8
+         | "exists" idents "." espec8
+         | espec7
+
+!?espec9 : "if" espec9 "then" espec9 "else" espec9
+         | espec8
 
 ?expr : expr8
 
@@ -49,11 +82,10 @@ ident : CNAME
 
 !?expr0 : expr0 expr_init
         | "not" expr_init
-        | "(" expr ")"
         | expr_init
 
-!?expr1 : expr0 "^" expr1
-        | expr0
+!?expr1 : expr0
+// expr0 "^" expr1
 
 !?expr2 : expr2 "*" expr1
         | expr2 "/" expr1
