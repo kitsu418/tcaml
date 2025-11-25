@@ -8,7 +8,6 @@ number : SIGNED_NUMBER
 bool : /(true|false)/
 ident : CNAME
 idents : ident+
-!measure : delta "->" delta
 
 !prog : def 
       | def ";" prog
@@ -23,19 +22,19 @@ idents : ident+
        | delta "array"
 
 !type : delta
-     | "{" ident ":" delta "|" espec "}"
-     | "(" ident ":" type ")" "->" type "@" cspec
-     | delta "->" delta
+      | "{" ident ":" delta "|" espec "}"
+      | "(" ident ":" type ")" "->" type "@" cspec
+      | delta "->" delta
 
-!cspec : espec
-      | "O(" espec ")"
+!cspec : "O(" espec ")"
+       | espec
 
 ?espec : espec9
 
 !espec_init : ident | number | bool
             | "(" expr_init ")"
 
-!?espec0 : measure espec_init
+!?espec0 : ident espec_init
          | "not" espec_init
          | "log" espec_init
          | espec_init

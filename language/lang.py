@@ -69,12 +69,6 @@ class EVar(Expr):
 
 
 @dataclass(frozen=True, slots=True, eq=True)
-class EMeasure(Expr):
-    left: EDelta
-    right: EDelta
-
-
-@dataclass(frozen=True, slots=True, eq=True)
 class EFuncDef(Expr):
     rec: bool
     typ: Type

@@ -61,10 +61,6 @@ class TCamlTransformer(Transformer):
     def idents(self, tree) -> list[str]:
         return [x.value for x in tree]
 
-    def measure(self, tree) -> Expr:
-        left, _, right = tree
-        return EMeasure(left, right)
-
     def prog(self, tree) -> list[Expr]:
         match get_values(tree):
             case (defn,):
@@ -150,7 +146,7 @@ class TCamlTransformer(Transformer):
                 for ident in reversed(idents):
                     cur = SPExists(ident, cur)
                 return cur
-            case (measure, inp):
+            case (measure, inp) if is_cname(measure):
                 return SPMeasureCall(measure, inp)
             case ("if", cond, "then", then, "else", els):
                 return SPIte(cond, then, els)
