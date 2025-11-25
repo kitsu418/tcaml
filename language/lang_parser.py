@@ -61,7 +61,8 @@ class TCamlTransformer(Transformer):
     def idents(self, tree) -> list[str]:
         return [x.value for x in tree]
 
-    def prog(self, tree) -> list[Expr]:
+    def prog(self, tree) -> list[tuple[str, Expr]]:
+        print(get_values(tree))
         match get_values(tree):
             case (defn,):
                 return [defn]
@@ -69,7 +70,7 @@ class TCamlTransformer(Transformer):
                 return [defn] + prog
         raise TCamlParserException(f"no match on prog expression {tree}")
 
-    def _def(self, tree) -> tuple[str, Expr]:
+    def defn(self, tree) -> tuple[str, Expr]:
         return tree[0]
 
     def funcdef(self, tree) -> tuple[str, Expr]:
@@ -82,8 +83,8 @@ class TCamlTransformer(Transformer):
         return ident, EFuncDef(rec, typ, body)
 
     def measuredef(self, tree) -> tuple[str, Expr]:
-        _, ident, _, inp, _, ret, _, body = tree
-        return ident, EMeasureDef(inp, ret, body)
+        _, ident, _, inp, _, typ, _, _, ret, _, body = get_values(tree)
+        return ident, EMeasureDef(inp, TBaseFunc(typ, ret), body)
 
     def delta_parser(self, tree) -> DeltaType:
         match get_values(tree):

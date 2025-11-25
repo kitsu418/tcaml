@@ -97,6 +97,20 @@ from language.lang_parser import parse
             "delta",
             DeltaArray(DeltaList(DeltaInt())),
         ),
+        (
+            "measure num_rows (mat: int array array) : int = len mat",
+            "prog",
+            [
+                (
+                    "num_rows",
+                    EMeasureDef(
+                        "mat",
+                        TBaseFunc(DeltaArray(DeltaArray(DeltaInt())), DeltaInt()),
+                        SPMeasureCall("len", SPVar("mat")),
+                    ),
+                )
+            ],
+        ),
     ],
 )
 def test_parse_exprs(program: str, start: str, expected: Expr) -> None:

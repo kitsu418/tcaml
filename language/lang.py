@@ -77,9 +77,9 @@ class EFuncDef(Expr):
 
 @dataclass(frozen=True, slots=True, eq=True)
 class EMeasureDef(Expr):
-    inp: DeltaType
-    ret: DeltaType
-    body: Expr
+    inp: str
+    typ: "TBaseFunc"
+    body: Spec
 
 
 @dataclass(frozen=True, slots=True, eq=True)

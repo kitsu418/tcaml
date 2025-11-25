@@ -9,12 +9,12 @@ bool : /(true|false)/
 ident : CNAME
 idents : ident+
 
-!prog : def 
-      | def ";" prog
+!prog : defn
+      | defn ";" prog
 
-!def : funcdef | measuredef
+!defn : funcdef | measuredef
 !funcdef : "let" "rec"? ident ":" type "=" expr
-!measuredef : "measure" ident ":" delta "->" delta "=" espec
+!measuredef : "measure" ident "(" ident ":" delta ")" ":" delta "=" espec
 
 ?delta : delta1
 !delta_init : "()" | "int" | "bool" | "(" delta ")"
