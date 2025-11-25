@@ -73,6 +73,30 @@ from language.lang_parser import parse
                 ),
             ),
         ),
+        (
+            "{ v: (int * int) list | len v = 5 }",
+            "type",
+            TRefinement(
+                "v",
+                DeltaList(DeltaTuple([DeltaInt(), DeltaInt()])),
+                SPBinOp(SPBinOpKinds("="), SPMeasureCall("len", SPVar("v")), SPInt(5)),
+            ),
+        ),
+        (
+            "int * int list",
+            "delta",
+            DeltaTuple([DeltaInt(), DeltaList(DeltaInt())]),
+        ),
+        (
+            "int * int * int",
+            "delta",
+            DeltaTuple([DeltaInt(), DeltaInt(), DeltaInt()]),
+        ),
+        (
+            "int list array",
+            "delta",
+            DeltaArray(DeltaList(DeltaInt())),
+        ),
     ],
 )
 def test_parse_exprs(program: str, start: str, expected: Expr) -> None:

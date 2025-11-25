@@ -85,7 +85,7 @@ class TCamlTransformer(Transformer):
         _, ident, _, inp, _, ret, _, body = tree
         return ident, EMeasureDef(inp, ret, body)
 
-    def delta(self, tree) -> DeltaType:
+    def delta_parser(self, tree) -> DeltaType:
         match get_values(tree):
             case ("()",):
                 return DeltaUnit()
@@ -93,13 +93,26 @@ class TCamlTransformer(Transformer):
                 return DeltaInt()
             case ("bool",):
                 return DeltaBool()
-            case (left, "*", right):
-                return DeltaProd(left, right)
+            case ("(", typ, ")"):
+                return typ
             case (typ, "list"):
                 return DeltaList(typ)
             case (typ, "array"):
                 return DeltaArray(typ)
         raise TCamlParserException(f"no match on delta expression {tree}")
+
+    delta_init = delta_parser
+    delta0 = delta_parser
+
+    # handles pairs
+    def delta1(self, tree) -> DeltaType:
+        vals = get_values(tree)
+        print(vals)
+        if len(vals) == 1:
+            return vals[0]
+        else:
+            every_other = list(get_values(tree)[::2])
+            return DeltaTuple(every_other)
 
     def type(self, tree) -> Type:
         match get_values(tree):

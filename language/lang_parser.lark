@@ -16,10 +16,10 @@ idents : ident+
 !funcdef : "let" "rec"? ident ":" type "=" expr
 !measuredef : "measure" ident ":" delta "->" delta "=" espec
 
-!delta : "()" | "int" | "bool"
-       | delta "*" delta
-       | delta "list"
-       | delta "array"
+?delta : delta1
+!delta_init : "()" | "int" | "bool" | "(" delta ")"
+!?delta0 : delta0 "list" | delta0 "array" | delta_init
+!?delta1 : delta0 ("*" delta0)*
 
 !type : delta
       | "{" ident ":" delta "|" espec "}"

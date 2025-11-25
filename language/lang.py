@@ -159,9 +159,8 @@ class DeltaBool(DeltaType):
 
 
 @dataclass(frozen=True, slots=True, eq=True)
-class DeltaProd(DeltaType):
-    left: DeltaType
-    right: DeltaType
+class DeltaTuple(DeltaType):
+    types: list[DeltaType]
 
 
 @dataclass(frozen=True, slots=True, eq=True)
