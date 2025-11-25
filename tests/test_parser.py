@@ -98,7 +98,13 @@ from language.lang_parser import parse
             DeltaArray(DeltaList(DeltaInt())),
         ),
         (
-            "measure num_rows (mat: int array array) : int = len mat",
+            r"""
+measure num_rows (mat: int array array) : int =
+  len mat;
+
+measure num_cols (mat: int array array) : int =
+  if num_rows mat > 0 then len (select mat 0) else 0;
+            """,
             "prog",
             [
                 (
@@ -108,7 +114,24 @@ from language.lang_parser import parse
                         TBaseFunc(DeltaArray(DeltaArray(DeltaInt())), DeltaInt()),
                         SPMeasureCall("len", SPVar("mat")),
                     ),
-                )
+                ),
+                (
+                    "num_cols",
+                    EMeasureDef(
+                        "mat",
+                        TBaseFunc(DeltaArray(DeltaArray(DeltaInt())), DeltaInt()),
+                        SPIte(
+                            SPBinOp(SPBinOpKinds(">"), SPVar("mat"), SPInt(0)),
+                            SPMeasureCall(
+                                "len",
+                                SPMeasureCall(
+                                    SPMeasureCall("select", SPVar("mat")), SPInt(0)
+                                ),
+                            ),
+                            SPInt(0),
+                        ),
+                    ),
+                ),
             ],
         ),
     ],
