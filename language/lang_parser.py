@@ -292,3 +292,19 @@ def parse(text: str, start: str | None = None) -> Expr:
         start = "prog"
     parser = construct_lark_parser(start)
     return parse_lark_repr(parser.parse(text))
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) <= 1:
+        print("usage: python3 language/lang_parser.py <file-name>")
+    else:
+        filename = sys.argv[1]
+        data = None
+        with open(filename, "r") as f:
+            data = f.read()
+        if data is None:
+            print("file missing")
+        else:
+            print(parse(data))
