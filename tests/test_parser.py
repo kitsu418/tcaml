@@ -79,7 +79,9 @@ from language.lang_parser import parse
             TRefinement(
                 "v",
                 DeltaList(DeltaTuple([DeltaInt(), DeltaInt()])),
-                SPBinOp(SPBinOpKinds("="), SPMeasureCall("len", SPVar("v")), SPInt(5)),
+                SPBinOp(
+                    SPBinOpKinds("="), SPMeasureCall(SPVar("len"), SPVar("v")), SPInt(5)
+                ),
             ),
         ),
         (
@@ -103,7 +105,7 @@ measure num_rows (mat: int array array) : int =
   len mat;
 
 measure num_cols (mat: int array array) : int =
-  if num_rows mat > 0 then len (select mat 0) else 0;
+  if num_rows mat > 0 then len (select mat 0) else 0
             """,
             "prog",
             [
@@ -112,7 +114,7 @@ measure num_cols (mat: int array array) : int =
                     EMeasureDef(
                         "mat",
                         TBaseFunc(DeltaArray(DeltaArray(DeltaInt())), DeltaInt()),
-                        SPMeasureCall("len", SPVar("mat")),
+                        SPMeasureCall(SPVar("len"), SPVar("mat")),
                     ),
                 ),
                 (
@@ -121,11 +123,16 @@ measure num_cols (mat: int array array) : int =
                         "mat",
                         TBaseFunc(DeltaArray(DeltaArray(DeltaInt())), DeltaInt()),
                         SPIte(
-                            SPBinOp(SPBinOpKinds(">"), SPVar("mat"), SPInt(0)),
+                            SPBinOp(
+                                SPBinOpKinds(">"),
+                                SPMeasureCall(SPVar("num_rows"), SPVar("mat")),
+                                SPInt(0),
+                            ),
                             SPMeasureCall(
-                                "len",
+                                SPVar("len"),
                                 SPMeasureCall(
-                                    SPMeasureCall("select", SPVar("mat")), SPInt(0)
+                                    SPMeasureCall(SPVar("select"), SPVar("mat")),
+                                    SPInt(0),
                                 ),
                             ),
                             SPInt(0),

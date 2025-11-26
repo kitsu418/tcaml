@@ -268,7 +268,7 @@ class SPExists(Spec):
 
 @dataclass(frozen=True, slots=True, eq=True)
 class SPMeasureCall(Spec):
-    measure: str
+    measure: Spec
     inp: Spec
 
 

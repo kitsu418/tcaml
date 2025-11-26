@@ -32,9 +32,9 @@ idents : ident+
 ?espec : espec9
 
 !espec_init : ident | number | bool
-            | "(" expr_init ")"
+            | "(" espec ")"
 
-!?espec0 : ident espec_init
+!?espec0 : espec0 espec_init
          | "not" espec_init
          | "log" espec_init
          | espec_init

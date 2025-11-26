@@ -160,7 +160,7 @@ class TCamlTransformer(Transformer):
                 for ident in reversed(idents):
                     cur = SPExists(ident, cur)
                 return cur
-            case (measure, inp) if is_cname(measure):
+            case (measure, inp):
                 return SPMeasureCall(measure, inp)
             case ("if", cond, "then", then, "else", els):
                 return SPIte(cond, then, els)
