@@ -12,9 +12,13 @@ idents : ident+
 !prog : defn
       | defn ";" prog
 
-!defn : funcdef | measuredef
+!defn : funcdef | measuredef | sugardef
 !funcdef : "let" "rec"? ident ":" type "=" expr
 !measuredef : "measure" ident "(" ident ":" delta ")" ":" delta "=" espec
+
+!sugardef : "let" "rec"? ident args ":" type "@" cspec "=" expr
+arg : "(" ident ":" type ")"
+args : arg+
 
 ?delta : delta1
 !delta_init : "()" | "int" | "bool" | "(" delta ")"
@@ -24,6 +28,7 @@ idents : ident+
 !type : delta
       | "{" ident ":" delta "|" espec "}"
       | "(" ident ":" type ")" "->" type "@" cspec
+      | "(" ident ":" type ")" "->" "(" type ")" "@" cspec
       | delta "->" delta
 
 !cspec : "O(" espec ")"

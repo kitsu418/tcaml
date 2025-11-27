@@ -86,6 +86,29 @@ class TCamlTransformer(Transformer):
         _, ident, _, inp, _, typ, _, _, ret, _, body = get_values(tree)
         return ident, EMeasureDef(inp, TBaseFunc(typ, ret), body)
 
+    def sugardef(self, tree) -> tuple[str, Expr]:
+        if tree[1].value == "rec":
+            rec = True
+            _, _, fname, args, _, typ, _, cspec, _, body = tree
+        else:
+            rec = False
+            _, fname, args, _, typ, _, cspec, _, body = tree
+
+        last_ident, last_typ = args[-1]
+        fn_type = TFunc(last_ident, last_typ, typ, cspec)
+        body = EFunc(last_ident, last_typ, body)
+        for ident, typ in reversed(args[:-1]):
+            fn_type = TFunc(ident, typ, fn_type, TSBigO(SPInt(1)))
+            body = EFunc(ident, typ, body)
+        return fname, EFuncDef(rec, fn_type, body)
+
+    def arg(self, tree) -> tuple[str, Type]:
+        return get_values(tree)
+
+    def args(self, tree) -> list[tuple[str, Type]]:
+        print("args", tree)
+        return tree
+
     def delta_parser(self, tree) -> DeltaType:
         match get_values(tree):
             case ("()",):
@@ -121,7 +144,19 @@ class TCamlTransformer(Transformer):
                 return TBase(dtype)
             case ("{", ident, ":", dtype, "|", espec, "}"):
                 return TRefinement(ident, dtype, espec)
-            case ("(", ident, ":", typ, ")", "->", ret, "@", cspec):
+            case ("(", ident, ":", typ, ")", "->", ret, "@", cspec) | (
+                "(",
+                ident,
+                ":",
+                typ,
+                ")",
+                "->",
+                "(",
+                ret,
+                ")",
+                "@",
+                cspec,
+            ):
                 return TFunc(ident, typ, ret, cspec)
             case (inp, "->", ret):
                 return TBaseFunc(inp, ret)

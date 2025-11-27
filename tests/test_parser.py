@@ -145,3 +145,20 @@ measure num_cols (mat: int array array) : int =
 )
 def test_parse_exprs(program: str, start: str, expected: Expr) -> None:
     assert parse(program, start) == expected
+
+
+@pytest.mark.parametrize(
+    "sugar,unsugared",
+    [
+        (
+            "let f (x : int) : int @ O(n) = x + 1",
+            "let f : (x : int) -> int @ O(n) = fun (x : int) -> x + 1",
+        ),
+        (
+            "let f (x : int) (y : int) : int @ O(n) = x + y",
+            "let f : (x : int) -> ((y : int) -> int @ O(n)) @ O(1) = fun (x : int) -> fun (y : int) -> x + y",
+        ),
+    ],
+)
+def test_sugar(sugar: str, unsugared: str) -> None:
+    assert parse(sugar) == parse(unsugared)
