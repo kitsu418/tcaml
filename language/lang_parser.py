@@ -61,7 +61,7 @@ class TCamlTransformer(Transformer):
     def idents(self, tree) -> list[str]:
         return [x.value for x in tree]
 
-    def prog(self, tree) -> list[tuple[str, Expr]]:
+    def prog(self, tree) -> Program:
         print(get_values(tree))
         match get_values(tree):
             case (defn,):

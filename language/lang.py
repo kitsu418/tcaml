@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import NewType
 
 
 # Base Types
@@ -28,6 +29,8 @@ class Spec:
 class Pattern:
     pass
 
+
+Program = list[tuple[str, Expr]]
 
 ## Expressions
 
