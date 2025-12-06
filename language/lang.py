@@ -52,11 +52,6 @@ class EBinOpKinds(Enum):
 
 
 @dataclass(frozen=True, slots=True, eq=True)
-class EDelta(Expr):
-    pass
-
-
-@dataclass(frozen=True, slots=True, eq=True)
 class EInt(Expr):
     value: int
 
