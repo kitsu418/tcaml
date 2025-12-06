@@ -140,7 +140,9 @@ def expr_cost_spec(
             right = expr_cost_spec(right, env, timespecs)
             return [x + y + 1 for x, y in product(left, right)]
         case EIte(cond, then, els):
-            pass
+            then = expr_cost_spec(then, env, timespecs)
+            els = expr_cost_spec(els, env, timespecs)
+            return then + els
         case ELet(rec, ident, typ, value, body):
             assert not rec, "recursive inner let not allowed"
             value = expr_cost_spec(value, env, timespecs)
