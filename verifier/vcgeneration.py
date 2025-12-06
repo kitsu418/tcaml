@@ -108,6 +108,55 @@ def spec_to_expr(spec: Spec, env: dict[str, sp.Expr]) -> sp.Expr:
             els = spec_to_expr(els, env)
             return (cond >> then) & ((~cond) >> els)
 
+def expr_to_symb(expr: Expr, env: dict[str, sp.Expr]) -> sp.Expr:
+    match expr:
+        case EBool(x):
+            return sp.sympify(x)
+        case EInt(x):
+            return sp.sympify(x)
+        case ENot(body):
+            return ~expr_to_symb(body, env)
+        case EBinOp(op, left, right):
+            left = expr_to_symb(left, env)
+            right = expr_to_symb(right, env)
+            match op:
+                case EBinOpKinds.ADD:
+                    return left + right
+                case EBinOpKinds.SUB:
+                    return left - right
+                case EBinOpKinds.MUL:
+                    return left * right
+                case EBinOpKinds.DIV:
+                    return left / right
+                case EBinOpKinds.MOD:
+                    return left % right
+                case EBinOpKinds.POW:
+                    return left**right
+                case EBinOpKinds.EQ:
+                    return sp.Eq(left, right)
+                case EBinOpKinds.NEQ:
+                    return ~sp.Eq(left, right)
+                case EBinOpKinds.LE:
+                    return left < right
+                case EBinOpKinds.GE:
+                    return left > right
+                case EBinOpKinds.LEQ:
+                    return left <= right
+                case EBinOpKinds.GEQ:
+                    return left >= right
+                case EBinOpKinds.AND:
+                    return left & right
+                case EBinOpKinds.OR:
+                    return left | right
+        case EVar(ident):
+            return env[ident]
+        case ELet(rec, ident, typ, value, body):
+            value = expr_to_symb(value, env)
+            new_env = env.copy()
+            new_env[ident] = value
+            return expr_to_symb(body, new_env)
+        case _:
+            return None
 
 def function_generate_vcs(
     func: EFuncDef, env: dict[str, Expr]
