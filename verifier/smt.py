@@ -1,3 +1,4 @@
+import itertools
 import math
 import z3
 import sympy as sp
@@ -204,3 +205,62 @@ class Z3Translator:
                 return pow_z3 ** k
         else:
             raise NotImplementedError(f"Unsupported exponential form: base={base}, exponent={exponent}")
+
+    def decompose_to_linear_combination(self,expr):
+        expanded_expr = sp.expand(expr)
+
+        if expanded_expr.is_Add:
+            terms = expanded_expr.args
+        else:
+            terms = [expanded_expr]
+
+        positive_terms = [t for t in terms if t.as_coeff_Mul()[0] > 0]
+
+        if not positive_terms:
+            return 0, sp.S.Zero
+        
+        dominant_term = positive_terms[0]
+        for term in positive_terms[1:]:
+            try:
+                ratio = sp.limit(term / dominant_term, self.n, sp.oo)
+                if ratio == sp.oo:
+                    dominant_term = term
+                elif ratio != 0 and ratio.is_finite:
+                    pass
+            except:
+                continue
+        
+        _, core_term = dominant_term.as_coeff_Mul()
+
+        if core_term.is_Mul:
+            factors = core_term.args
+        else:
+            factors = [core_term]
+
+        factor_chains = []
+
+        for factor in factors:
+            chain = []
+            base, exp = factor.as_base_exp()
+
+            if exp.is_Integer and exp > 0:
+                for k in range(int(exp) + 1):
+                    chain.append(base**k)
+            else:
+                chain = [factor, sp.S.One]
+                
+            factor_chains.append(chain)
+
+        result_terms = []
+        coeffs = []
+        product = list(itertools.product(*factor_chains))
+        print(product)
+        product = sorted(product, key=lambda x: str(sp.Mul(*x)))
+        print(product)
+        for combo in product:
+            term = self.translate(sp.Mul(*combo))
+            coeff = z3.Real(f"c_{len(result_terms)}")
+            coeffs.append(coeff)
+            result_terms.append(coeff * term)
+
+        return z3.Sum(result_terms), coeffs
