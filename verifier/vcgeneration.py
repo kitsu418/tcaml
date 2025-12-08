@@ -35,16 +35,12 @@ def program_generate_vcs(prog: Program) -> ProgramRecurrence:
     for name, val in prog:
         match val:
             case EMeasureDef(_):
-                funcs[name] = val
+                assert False, "custom measures not supported yet"
             case EFuncDef(rec, typ, body):
                 assert isinstance(typ, TFunc)
 
                 arg_env, arg_constraint = arguments_to_env(body)
                 timespec = timespec_to_sympy(typ.time, arg_env)
-
-                if rec:
-                    funcs[name] = (typ.time, body)
-
                 local_costs = expr_cost_spec(body, env, funcs)
 
     return ProgramRecurrence()
@@ -61,7 +57,7 @@ def arguments_to_env(body: Expr) -> tuple[VariableMap, sp.Expr]:
                     case TRefinement(inner_ident, dtyp, spec):
                         assert isinstance(dtyp, DeltaInt), "non-int unimplemented"
                         cur_var = create_fresh(ident)
-                        local_env = env.copy()
+                        local_env = VariableMap(env.copy())
                         local_env[inner_ident] = cur_var
                         local_constraint = spec_to_expr(spec, local_env)
                         constraint = constraint & local_constraint
@@ -76,7 +72,7 @@ def arguments_to_env(body: Expr) -> tuple[VariableMap, sp.Expr]:
             case _:
                 return env, constraint
 
-    return helper(body, {}, sp.sympify(True))
+    return helper(body, VariableMap({}), sp.sympify(True))
 
 
 def timespec_to_sympy(spec: TimeSpec, env: VariableMap) -> sp.Expr:
@@ -155,7 +151,7 @@ def cost_of_funccall(
     expr: EFuncCall, env: VariableMap, funcs: FuncDefs
 ) -> list[list[FuncCall]]:
     arg_values: list[sp.Expr | None] = []
-    cur = expr
+    cur: Expr = expr
     costs: list[list[FuncCall]] = [[]]
 
     while True:
@@ -182,52 +178,53 @@ def expr_cost_spec(
 ) -> tuple[sp.Expr | None, list[list[FuncCall]]]:
     match expr:
         case EInt(x) | EBool(x):
-            return sp.sympify(x), [sp.sympify(1)]
+            return sp.sympify(x), [[]]
         case EVar(var):
-            return env[var], [sp.sympify(1)]
+            return env[var], [[]]
         case ENil():
-            return sp.sympify(1), [sp.sympify(1)]
+            return sp.sympify(1), [[]]
         case ECons(body):
             body_value, body_costs = expr_cost_spec(body, env, funcs)
             value = bind_opt(body_value, lambda x: x + 1)
-            costs = [x + 1 for x in body_costs]
+            costs = body_costs
             return value, costs
         case EFuncDef(_) | EMeasureDef(_):
             assert False, "not allowed in function body"
         case ENot(body):
             body_val, body_costs = expr_cost_spec(body, env, funcs)
             value = bind_opt(body_val, lambda x: ~x)
-            costs = [x + 1 for x in body_costs]
+            costs = body_costs
             return value, costs
         case EBinOp(op, left, right):
             left_value, left_costs = expr_cost_spec(left, env, funcs)
             right_value, right_costs = expr_cost_spec(right, env, funcs)
             value = eval_binop(op, left_value, right_value)
-            costs = [x + y + 1 for x, y in product(left_costs, right_costs)]
+            costs = merge_product(left_costs, right_costs)
             return value, costs
         case EIte(cond, then, els):
             # TODO: implement computing the value of a conditional
             _, cond_costs = expr_cost_spec(cond, env, funcs)
             _, then_costs = expr_cost_spec(then, env, funcs)
             _, els_costs = expr_cost_spec(els, env, funcs)
-            return None, [
-                x + y + z for x, y, z in product(cond_costs, then_costs, els_costs)
-            ]
+            then_costs = merge_product(cond_costs, then_costs)
+            els_costs = merge_product(cond_costs, els_costs)
+            return None, then_costs + els_costs
         case ELet(rec, ident, typ, value, body):
             assert not rec, "recursive inner let not allowed"
             value_value, value_costs = expr_cost_spec(value, env, funcs)
             new_env = VariableMap(env.copy())
             new_env[ident] = value_value
             body_value, body_costs = expr_cost_spec(body, new_env, funcs)
-            return body_value, [x + y for x, y in product(value_costs, body_costs)]
-            return [x + y for x, y in product(value, body)]
+            costs = merge_product(value_costs, body_costs)
+            return body_value, body_costs
         case EFunc(_):
             assert False, "local functions not supported"
         case EFuncCall(_):
-            return None, [cost_of_funccall(expr, env, funcs)]
+            return None, cost_of_funccall(expr, env, funcs)
         case EMatch(_):
             # TODO: match on len
             assert False, "unimpl"
+    assert False, f"{expr} is unmatched"
 
 
 def eval_binop(
@@ -246,8 +243,6 @@ def eval_binop(
             return left / right
         case EBinOpKinds.MOD:
             return left % right
-        case EBinOpKinds.POW:
-            return left**right
         case EBinOpKinds.EQ:
             return sp.Eq(left, right)
         case EBinOpKinds.NEQ:
@@ -264,9 +259,3 @@ def eval_binop(
             return left & right
         case EBinOpKinds.OR:
             return left | right
-
-
-def function_generate_vcs(
-    func: EFuncDef, env: dict[str, Expr]
-) -> list[RecurrenceBranch]:
-    pass
