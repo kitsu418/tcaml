@@ -5,10 +5,26 @@ from itertools import product
 from language.lang import *
 from utils.recurrence import RecurrenceBranch, ProgramRecurrence
 from utils.sympy_vars import create_fresh
-from typing import NewType, TypeVar
+from typing import NewType
 
+FuncArgsMap = NewType("FuncArgsMap", dict[sp.Expr, sp.Expr | None])
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class FuncInfo:
+    args: list[sp.Expr]
+    timespec: sp.Expr
+    size: sp.Expr
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class FuncCall:
+    func_name: str
+    args: FuncArgsMap
+
+
+FuncDefs = NewType("FuncDefs", dict[str, FuncInfo])
 VariableMap = NewType("VariableMap", dict[str, sp.Expr | None])
-FuncDefs = NewType("FuncDefs", dict[str, tuple[TimeSpec, Expr]])
 
 
 def program_generate_vcs(prog: Program) -> ProgramRecurrence:
@@ -68,10 +84,12 @@ def timespec_to_sympy(spec: TimeSpec, env: VariableMap) -> sp.Expr:
     return spec_to_expr(spec.spec, env)
 
 
-def spec_to_expr(spec: Spec, env: dict[str, sp.Expr]) -> sp.Expr:
+def spec_to_expr(spec: Spec, env: VariableMap) -> sp.Expr:
     match spec:
         case SPVar(ident):
-            return env[ident]
+            value = env[ident]
+            assert value is not None
+            return value
         case SPInt(x) | SPBool(x):
             return sp.sympify(x)
         case SPNot(body):
@@ -122,24 +140,46 @@ def spec_to_expr(spec: Spec, env: dict[str, sp.Expr]) -> sp.Expr:
             return (cond >> then) & ((~cond) >> els)
 
 
-def cost_of_funccall(expr: EFuncCall, env: VariableMap, timespecs: FuncDefs) -> sp.Expr:
-    pass
-
-
-T = TypeVar("T")
-U = TypeVar("U")
-
-
-def bind_opt(val: T | None, func: Callable[[T], U | None]) -> U | None:
+def bind_opt[T, U](val: T | None, func: Callable[[T], U | None]) -> U | None:
     if val is None:
         return None
     else:
         return func(val)
 
 
+def merge_product[T](xss: list[list[T]], yss: list[list[T]]) -> list[list[T]]:
+    return [xs + ys for xs in xss for ys in yss]
+
+
+def cost_of_funccall(
+    expr: EFuncCall, env: VariableMap, funcs: FuncDefs
+) -> list[list[FuncCall]]:
+    arg_values: list[sp.Expr | None] = []
+    cur = expr
+    costs: list[list[FuncCall]] = [[]]
+
+    while True:
+        match cur:
+            case EFuncCall(func, arg):
+                arg_value, arg_costs = expr_cost_spec(arg, env, funcs)
+                arg_values.append(arg_value)
+                costs = merge_product(costs, arg_costs)
+                cur = func
+            case EVar(fname):
+                info = funcs[fname]
+                args = info.args
+                break
+            case _:
+                assert False, "unimpl"
+
+    argmap = FuncArgsMap({arg: value for arg, value in zip(args, arg_values)})
+    this_call = FuncCall(fname, argmap)
+    return merge_product([[this_call]], costs)
+
+
 def expr_cost_spec(
     expr: Expr, env: VariableMap, funcs: FuncDefs
-) -> tuple[sp.Expr | None, list[sp.Expr]]:
+) -> tuple[sp.Expr | None, list[list[FuncCall]]]:
     match expr:
         case EInt(x) | EBool(x):
             return sp.sympify(x), [sp.sympify(1)]
@@ -156,7 +196,7 @@ def expr_cost_spec(
             assert False, "not allowed in function body"
         case ENot(body):
             body_val, body_costs = expr_cost_spec(body, env, funcs)
-            value = bind_opt(body_val, lambda x: x + 1)
+            value = bind_opt(body_val, lambda x: ~x)
             costs = [x + 1 for x in body_costs]
             return value, costs
         case EBinOp(op, left, right):
@@ -176,7 +216,7 @@ def expr_cost_spec(
         case ELet(rec, ident, typ, value, body):
             assert not rec, "recursive inner let not allowed"
             value_value, value_costs = expr_cost_spec(value, env, funcs)
-            new_env = env.copy()
+            new_env = VariableMap(env.copy())
             new_env[ident] = value_value
             body_value, body_costs = expr_cost_spec(body, new_env, funcs)
             return body_value, [x + y for x, y in product(value_costs, body_costs)]
