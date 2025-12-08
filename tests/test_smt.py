@@ -179,13 +179,13 @@ def test_merge_sort_is_nlogn():
     split_l = sp.Symbol('split_l')
     merge_l1 = sp.Symbol('merge_l1')
     merge_l2 = sp.Symbol('merge_l2')
-    sorted1 = sp.Symbol('sorted1')
-    sorted2 = sp.Symbol('sorted2')
+    mergesort_local_sorted1 = sp.Symbol('mergesort_local_sorted1')
+    mergesort_local_sorted2 = sp.Symbol('mergesort_local_sorted2')
     mergesort_local_l1 = sp.Symbol('mergesort_local_l1')
     mergesort_local_l2 = sp.Symbol('mergesort_local_l2')
 
     value_map = {_len(merge_l1): _len(mergesort_l) / 2, _len(merge_l2): _len(mergesort_l) / 2, \
-                 _len(sorted1): _len(mergesort_l) / 2, _len(sorted2): _len(mergesort_l) / 2, \
+                 _len(mergesort_local_sorted1): _len(mergesort_l) / 2, _len(mergesort_local_sorted2): _len(mergesort_l) / 2, \
                  _len(split_l): _len(mergesort_l), \
                  _len(mergesort_local_l1): _len(mergesort_l) / 2, _len(mergesort_local_l2): _len(mergesort_l) / 2}
     
@@ -197,7 +197,7 @@ def test_merge_sort_is_nlogn():
     n_split_prime = translators['split'].get_n_sub_at_call({_len(split_l): _len(mergesort_l)}).subs({translators['mergesort'].size_expr: mergesort_n})
     n_mergesort_prime_1 = translators['mergesort'].get_n_sub_at_call({_len(mergesort_l): value_map[_len(mergesort_local_l1)]}).subs({translators['mergesort'].size_expr: mergesort_n})
     n_mergesort_prime_2 = translators['mergesort'].get_n_sub_at_call({_len(mergesort_l): value_map[_len(mergesort_local_l2)]}).subs({translators['mergesort'].size_expr: mergesort_n})
-    n_merge = translators['merge'].get_n_sub_at_call({_len(merge_l1): value_map[_len(sorted1)], _len(merge_l2): value_map[_len(sorted2)]}).subs({translators['mergesort'].size_expr: mergesort_n})
+    n_merge = translators['merge'].get_n_sub_at_call({_len(merge_l1): value_map[_len(mergesort_local_sorted1)], _len(merge_l2): value_map[_len(mergesort_local_sorted2)]}).subs({translators['mergesort'].size_expr: mergesort_n})
 
     costs = [translators['split'].decompose_to_linear_combination(translators['split'].cost_expr, n_split_prime),
              translators['mergesort'].decompose_to_linear_combination(translators['mergesort'].cost_expr, n_mergesort_prime_1),
@@ -210,8 +210,8 @@ def test_merge_sort_is_nlogn():
         coeffs.update(c[1])
 
     s = z3.Solver()
-    s.add(costexpr <= translators['mergesort'].decompose_to_linear_combination(translators['mergesort'].cost_expr)[0])
-    s.add(z3.Real('n') >= 0)
+    n = z3.Real('n')
+    s.add(z3.ForAll([n], z3.Implies(n >= 0, costexpr <= translators['mergesort'].decompose_to_linear_combination(translators['mergesort'].cost_expr)[0])))
     for coeff in coeffs:
         s.add(coeff >= 0)
     s.add(z3.Sum(coeffs) != 0)
@@ -226,13 +226,13 @@ def test_merge_sort_is_n():
     split_l = sp.Symbol('split_l')
     merge_l1 = sp.Symbol('merge_l1')
     merge_l2 = sp.Symbol('merge_l2')
-    sorted1 = sp.Symbol('sorted1')
-    sorted2 = sp.Symbol('sorted2')
+    mergesort_local_sorted1 = sp.Symbol('mergesort_local_sorted1')
+    mergesort_local_sorted2 = sp.Symbol('mergesort_local_sorted2')
     mergesort_local_l1 = sp.Symbol('mergesort_local_l1')
     mergesort_local_l2 = sp.Symbol('mergesort_local_l2')
 
     value_map = {_len(merge_l1): _len(mergesort_l) / 2, _len(merge_l2): _len(mergesort_l) / 2, \
-                 _len(sorted1): _len(mergesort_l) / 2, _len(sorted2): _len(mergesort_l) / 2, \
+                 _len(mergesort_local_sorted1): _len(mergesort_l) / 2, _len(mergesort_local_sorted2): _len(mergesort_l) / 2, \
                  _len(split_l): _len(mergesort_l), \
                  _len(mergesort_local_l1): _len(mergesort_l) / 2, _len(mergesort_local_l2): _len(mergesort_l) / 2}
     
@@ -244,7 +244,7 @@ def test_merge_sort_is_n():
     n_split_prime = translators['split'].get_n_sub_at_call({_len(split_l): _len(mergesort_l)}).subs({translators['mergesort'].size_expr: mergesort_n})
     n_mergesort_prime_1 = translators['mergesort'].get_n_sub_at_call({_len(mergesort_l): value_map[_len(mergesort_local_l1)]}).subs({translators['mergesort'].size_expr: mergesort_n})
     n_mergesort_prime_2 = translators['mergesort'].get_n_sub_at_call({_len(mergesort_l): value_map[_len(mergesort_local_l2)]}).subs({translators['mergesort'].size_expr: mergesort_n})
-    n_merge = translators['merge'].get_n_sub_at_call({_len(merge_l1): value_map[_len(sorted1)], _len(merge_l2): value_map[_len(sorted2)]}).subs({translators['mergesort'].size_expr: mergesort_n})
+    n_merge = translators['merge'].get_n_sub_at_call({_len(merge_l1): value_map[_len(mergesort_local_sorted1)], _len(merge_l2): value_map[_len(mergesort_local_sorted2)]}).subs({translators['mergesort'].size_expr: mergesort_n})
 
     costs = [translators['split'].decompose_to_linear_combination(translators['split'].cost_expr, n_split_prime),
              translators['mergesort'].decompose_to_linear_combination(translators['mergesort'].cost_expr, n_mergesort_prime_1),
