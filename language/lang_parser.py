@@ -62,7 +62,6 @@ class TCamlTransformer(Transformer):
         return [x.value for x in tree]
 
     def prog(self, tree) -> Program:
-        print(get_values(tree))
         match get_values(tree):
             case (defn,):
                 return [defn]
@@ -106,7 +105,6 @@ class TCamlTransformer(Transformer):
         return get_values(tree)
 
     def args(self, tree) -> list[tuple[str, Type]]:
-        print("args", tree)
         return tree
 
     def delta_parser(self, tree) -> DeltaType:
@@ -131,7 +129,6 @@ class TCamlTransformer(Transformer):
     # handles pairs
     def delta1(self, tree) -> DeltaType:
         vals = get_values(tree)
-        print(vals)
         if len(vals) == 1:
             return vals[0]
         else:
@@ -185,13 +182,11 @@ class TCamlTransformer(Transformer):
                 return SPBinOp(SPBinOpKinds(op), left, right)
             case ("forall", idents, ".", spec):
                 cur = spec
-                print("here", idents)
                 for ident in reversed(idents):
                     cur = SPForAll(ident, cur)
                 return cur
             case ("exists", idents, ".", spec):
                 cur = spec
-                print("here", idents)
                 for ident in reversed(idents):
                     cur = SPExists(ident, cur)
                 return cur
@@ -222,7 +217,6 @@ class TCamlTransformer(Transformer):
     espec9 = espec_parser
 
     def expr_parser(self, tree) -> Expr:
-        print(get_values(tree))
         match get_values(tree):
             case (ident,) if is_cname(ident):
                 return EVar(ident)
@@ -316,7 +310,6 @@ def construct_lark_parser(start: str) -> Lark:
 
 
 def parse_lark_repr(tree: Tree) -> Expr:
-    print(tree)
     transformer = TCamlTransformer()
     result_tree = transformer.transform(tree)
     return result_tree
