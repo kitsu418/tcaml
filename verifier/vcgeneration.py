@@ -125,15 +125,21 @@ def spec_to_expr(spec: Spec, env: dict[str, sp.Expr]) -> sp.Expr:
 def cost_of_funccall(expr: EFuncCall, env: VariableMap, timespecs: FuncDefs) -> sp.Expr:
     pass
 
-T = TypeVar('T')
-U = TypeVar('U')
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+
 def bind_opt(val: T | None, func: Callable[[T], U | None]) -> U | None:
     if val is None:
         return None
     else:
         return func(val)
 
-def expr_cost_spec(expr: Expr, env: VariableMap, funcs: FuncDefs) -> tuple[sp.Expr | None, list[sp.Expr]]:
+
+def expr_cost_spec(
+    expr: Expr, env: VariableMap, funcs: FuncDefs
+) -> tuple[sp.Expr | None, list[sp.Expr]]:
     match expr:
         case EInt(x) | EBool(x):
             return sp.sympify(x), [sp.sympify(1)]
@@ -164,7 +170,9 @@ def expr_cost_spec(expr: Expr, env: VariableMap, funcs: FuncDefs) -> tuple[sp.Ex
             _, cond_costs = expr_cost_spec(cond, env, funcs)
             _, then_costs = expr_cost_spec(then, env, funcs)
             _, els_costs = expr_cost_spec(els, env, funcs)
-            return None, [x + y + z for x, y, z in product(cond_costs, then_costs, els_costs)]
+            return None, [
+                x + y + z for x, y, z in product(cond_costs, then_costs, els_costs)
+            ]
         case ELet(rec, ident, typ, value, body):
             assert not rec, "recursive inner let not allowed"
             value_value, value_costs = expr_cost_spec(value, env, funcs)
@@ -181,7 +189,10 @@ def expr_cost_spec(expr: Expr, env: VariableMap, funcs: FuncDefs) -> tuple[sp.Ex
             # TODO: match on len
             assert False, "unimpl"
 
-def eval_binop(op: EBinOpKinds, left: sp.Expr | None, right: sp.Expr | None) -> sp.Expr | None:
+
+def eval_binop(
+    op: EBinOpKinds, left: sp.Expr | None, right: sp.Expr | None
+) -> sp.Expr | None:
     if left is None or right is None:
         return None
     match op:
