@@ -4,21 +4,21 @@ from itertools import product
 from language.lang import *
 from utils.recurrence import RecurrenceBranch, ProgramRecurrence
 from utils.sympy_vars import create_fresh
-from typing import Newtype
+from typing import NewType
 
 VariableMap = NewType("VariableMap", dict[str, sp.Expr])
-TimeSpecMap = NewType("TimeSpecMap", dict[str, sp.Expr])
+FuncDefs = NewType("FuncDefs", dict[str, tuple[TimeSpec, Expr]])
 
 
 def program_generate_vcs(prog: Program) -> ProgramRecurrence:
     env = VariableMap({})
-    timespecs = TimeSpecMap({})
+    funcs = FuncDefs({})
     constraints = sp.sympify(True)
 
     for name, val in prog:
         match val:
             case EMeasureDef(_):
-                env[name] = val
+                funcs[name] = val
             case EFuncDef(rec, typ, body):
                 assert isinstance(typ, TFunc)
 
@@ -26,7 +26,9 @@ def program_generate_vcs(prog: Program) -> ProgramRecurrence:
                 timespec = timespec_to_sympy(typ.time, arg_env)
 
                 if rec:
-                    timespecs[name] = timespec
+                    funcs[name] = (typ.time, body)
+
+                local_costs = expr_cost_spec(body, env, funcs)
 
     return ProgramRecurrence()
 
@@ -118,15 +120,12 @@ def spec_to_expr(spec: Spec, env: dict[str, sp.Expr]) -> sp.Expr:
             els = spec_to_expr(els, env)
             return (cond >> then) & ((~cond) >> els)
 
-
-def cost_of_funccall(
-    expr: EFuncCall, env: VariableMap, timespecs: TimeSpecMap
-) -> sp.Expr:
+def cost_of_funccall(expr: EFuncCall, env: VariableMap, timespecs: FuncDefs) -> sp.Expr:
     pass
 
 
 def expr_cost_spec(
-    expr: Expr, env: VariableMap, timespecs: TimeSpecMap
+    expr: Expr, env: VariableMap, funcs: FuncDefs
 ) -> list[sp.Expr]:
     match expr:
         case EInt(_) | EBool(_) | EVar(_) | ENil() | ECons(_):
@@ -134,24 +133,24 @@ def expr_cost_spec(
         case EFuncDef(_) | EMeasureDef(_):
             assert False, "not allowed in function body"
         case ENot(body):
-            return [x + 1 for x in expr_cost_spec(body, env, timespecs)]
+            return [x + 1 for x in expr_cost_spec(body, env, funcs)]
         case EBinOp(_, left, right):
-            left = expr_cost_spec(left, env, timespecs)
-            right = expr_cost_spec(right, env, timespecs)
+            left = expr_cost_spec(left, env, funcs)
+            right = expr_cost_spec(right, env, funcs)
             return [x + y + 1 for x, y in product(left, right)]
         case EIte(cond, then, els):
-            then = expr_cost_spec(then, env, timespecs)
-            els = expr_cost_spec(els, env, timespecs)
+            then = expr_cost_spec(then, env, funcs)
+            els = expr_cost_spec(els, env, funcs)
             return then + els
         case ELet(rec, ident, typ, value, body):
             assert not rec, "recursive inner let not allowed"
-            value = expr_cost_spec(value, env, timespecs)
-            body = expr_cost_spec(body, env, timespecs)
+            value = expr_cost_spec(value, env, funcs)
+            body = expr_cost_spec(body, env, funcs)
             return [x + y for x, y in product(value, body)]
         case EFunc(_):
             assert False, "local functions not supported"
-        case EFuncCall(func, expr):
-            assert False, "unimpl"
+        case EFuncCall(_):
+            return [cost_of_funccall(expr, env, funcs)]
         case EMatch(_):
             # TODO: match on len
             assert False, "unimpl"
