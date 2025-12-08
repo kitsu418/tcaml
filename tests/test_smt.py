@@ -170,3 +170,97 @@ def test_exponential_complex_structure():
     s.add(pow_var == 2)
     s.add(z3_ceil == 8)
     assert s.check() == z3.sat
+
+def test_merge_sort_is_nlogn():
+    funcs = ['mergesort', 'split', 'merge']
+    translators = {fname: Z3Translator(fname) for fname in funcs}
+    _len = sp.Function('len')
+    mergesort_l = sp.Symbol('mergesort_l')
+    split_l = sp.Symbol('split_l')
+    merge_l1 = sp.Symbol('merge_l1')
+    merge_l2 = sp.Symbol('merge_l2')
+    sorted1 = sp.Symbol('sorted1')
+    sorted2 = sp.Symbol('sorted2')
+    mergesort_local_l1 = sp.Symbol('mergesort_local_l1')
+    mergesort_local_l2 = sp.Symbol('mergesort_local_l2')
+
+    value_map = {_len(merge_l1): _len(mergesort_l) / 2, _len(merge_l2): _len(mergesort_l) / 2, \
+                 _len(sorted1): _len(mergesort_l) / 2, _len(sorted2): _len(mergesort_l) / 2, \
+                 _len(split_l): _len(mergesort_l), \
+                 _len(mergesort_local_l1): _len(mergesort_l) / 2, _len(mergesort_local_l2): _len(mergesort_l) / 2}
+    
+    translators['mergesort'].set_cost_template(_len(mergesort_l) * sp.log(_len(mergesort_l)), _len(mergesort_l))
+    translators['split'].set_cost_template(_len(split_l), _len(split_l))
+    translators['merge'].set_cost_template(_len(merge_l1) + _len(merge_l2), _len(merge_l1) + _len(merge_l2))
+    mergesort_n = translators['mergesort'].n
+
+    n_split_prime = translators['split'].get_n_sub_at_call({_len(split_l): _len(mergesort_l)}).subs({translators['mergesort'].size_expr: mergesort_n})
+    n_mergesort_prime_1 = translators['mergesort'].get_n_sub_at_call({_len(mergesort_l): value_map[_len(mergesort_local_l1)]}).subs({translators['mergesort'].size_expr: mergesort_n})
+    n_mergesort_prime_2 = translators['mergesort'].get_n_sub_at_call({_len(mergesort_l): value_map[_len(mergesort_local_l2)]}).subs({translators['mergesort'].size_expr: mergesort_n})
+    n_merge = translators['merge'].get_n_sub_at_call({_len(merge_l1): value_map[_len(sorted1)], _len(merge_l2): value_map[_len(sorted2)]}).subs({translators['mergesort'].size_expr: mergesort_n})
+
+    costs = [translators['split'].decompose_to_linear_combination(translators['split'].cost_expr, n_split_prime),
+             translators['mergesort'].decompose_to_linear_combination(translators['mergesort'].cost_expr, n_mergesort_prime_1),
+             translators['mergesort'].decompose_to_linear_combination(translators['mergesort'].cost_expr, n_mergesort_prime_2),
+             translators['merge'].decompose_to_linear_combination(translators['merge'].cost_expr, n_merge)]
+    
+    costexpr = z3.Sum([c[0] for c in costs])
+    coeffs = set()
+    for c in costs:
+        coeffs.update(c[1])
+
+    s = z3.Solver()
+    s.add(costexpr <= translators['mergesort'].decompose_to_linear_combination(translators['mergesort'].cost_expr)[0])
+    s.add(z3.Real('n') >= 0)
+    for coeff in coeffs:
+        s.add(coeff >= 0)
+    s.add(z3.Sum(coeffs) != 0)
+
+    assert s.check() == z3.sat
+
+def test_merge_sort_is_n():
+    funcs = ['mergesort', 'split', 'merge']
+    translators = {fname: Z3Translator(fname) for fname in funcs}
+    _len = sp.Function('len')
+    mergesort_l = sp.Symbol('mergesort_l')
+    split_l = sp.Symbol('split_l')
+    merge_l1 = sp.Symbol('merge_l1')
+    merge_l2 = sp.Symbol('merge_l2')
+    sorted1 = sp.Symbol('sorted1')
+    sorted2 = sp.Symbol('sorted2')
+    mergesort_local_l1 = sp.Symbol('mergesort_local_l1')
+    mergesort_local_l2 = sp.Symbol('mergesort_local_l2')
+
+    value_map = {_len(merge_l1): _len(mergesort_l) / 2, _len(merge_l2): _len(mergesort_l) / 2, \
+                 _len(sorted1): _len(mergesort_l) / 2, _len(sorted2): _len(mergesort_l) / 2, \
+                 _len(split_l): _len(mergesort_l), \
+                 _len(mergesort_local_l1): _len(mergesort_l) / 2, _len(mergesort_local_l2): _len(mergesort_l) / 2}
+    
+    translators['mergesort'].set_cost_template(_len(mergesort_l), _len(mergesort_l))
+    translators['split'].set_cost_template(_len(split_l), _len(split_l))
+    translators['merge'].set_cost_template(_len(merge_l1) + _len(merge_l2), _len(merge_l1) + _len(merge_l2))
+    mergesort_n = translators['mergesort'].n
+
+    n_split_prime = translators['split'].get_n_sub_at_call({_len(split_l): _len(mergesort_l)}).subs({translators['mergesort'].size_expr: mergesort_n})
+    n_mergesort_prime_1 = translators['mergesort'].get_n_sub_at_call({_len(mergesort_l): value_map[_len(mergesort_local_l1)]}).subs({translators['mergesort'].size_expr: mergesort_n})
+    n_mergesort_prime_2 = translators['mergesort'].get_n_sub_at_call({_len(mergesort_l): value_map[_len(mergesort_local_l2)]}).subs({translators['mergesort'].size_expr: mergesort_n})
+    n_merge = translators['merge'].get_n_sub_at_call({_len(merge_l1): value_map[_len(sorted1)], _len(merge_l2): value_map[_len(sorted2)]}).subs({translators['mergesort'].size_expr: mergesort_n})
+
+    costs = [translators['split'].decompose_to_linear_combination(translators['split'].cost_expr, n_split_prime),
+             translators['mergesort'].decompose_to_linear_combination(translators['mergesort'].cost_expr, n_mergesort_prime_1),
+             translators['mergesort'].decompose_to_linear_combination(translators['mergesort'].cost_expr, n_mergesort_prime_2),
+             translators['merge'].decompose_to_linear_combination(translators['merge'].cost_expr, n_merge)]
+    
+    costexpr = z3.Sum([c[0] for c in costs])
+    coeffs = set()
+    for c in costs:
+        coeffs.update(c[1])
+
+    s = z3.Solver()
+    s.add(costexpr <= translators['mergesort'].decompose_to_linear_combination(translators['mergesort'].cost_expr)[0])
+    s.add(z3.Real('n') >= 0)
+    for coeff in coeffs:
+        s.add(coeff > 0)
+    s.add(z3.Sum(coeffs) != 0)
+
+    assert s.check() == z3.unsat

@@ -5,10 +5,11 @@ import sympy as sp
 from typing import Dict, Optional
 
 class Z3Translator:
-    def __init__(self):
+    def __init__(self, func: str = 'f'):
         self.n = sp.Symbol('n', positive=True)
         self.log_n_var = z3.Real(f'log_n')
         self.exp_vars = {}
+        self.func = func
         
         self.subs_source: Optional[sp.Symbol] = None
         self.subs_target: Optional[sp.Expr] = None
@@ -39,13 +40,13 @@ class Z3Translator:
                     break
             except:
                 continue
+
+    def set_cost_template(self, cost_expr: sp.Expr, size_expr: sp.Expr):
+        self.cost_expr = cost_expr
+        self.size_expr = size_expr
+        self.set_size_definition(size_expr)
     
     def _to_n_domain(self, expr: sp.Expr) -> sp.Expr:
-        # if self.subs_source is not None and self.subs_target is not None:
-        #     if self.subs_source in expr.free_symbols:
-        #         new_expr = expr.subs(self.subs_source, self.subs_target)
-        #         return sp.simplify(new_expr)
-        # return expr
         if self.subs_source is None or self.subs_target is None:
             return expr
 
@@ -63,7 +64,6 @@ class Z3Translator:
 
         new_expr = expr.subs(self.subs_source, self.subs_target)
 
-        print(f"Substituting {self.subs_source} with {self.subs_target} in {expr} -> {new_expr}")
         return sp.simplify(new_expr)
             
     def _is_pure_n(self, expr: sp.Expr) -> bool:
@@ -81,10 +81,24 @@ class Z3Translator:
     def constant_eval(self, expr: sp.Expr) -> float:
         if isinstance(expr, sp.log):
             return float((expr / sp.log(2)).evalf())
-        elif expr.has(sp.log):
-            raise ValueError(f"Expression has log terms: {expr}")
         else:
-            return float(expr.evalf())
+            if expr.is_Number:
+                return float(expr.evalf())
+            elif expr.is_Add:
+                total = 0.0
+                for arg in expr.args:
+                    total += self.constant_eval(arg)
+                return total
+            elif expr.is_Mul:
+                total = 1.0
+                for arg in expr.args:
+                    total *= self.constant_eval(arg)
+                return total
+            elif expr.is_Pow:
+                base, exponent = expr.args
+                return self.constant_eval(base) ** self.constant_eval(exponent)
+            else:
+                raise ValueError(f"Unsupported constant expression: {expr}")
 
     def translate(self, expr: sp.Expr) -> z3.ExprRef:      
         expr_transformed = sp.expand(self._to_n_domain(expr))
@@ -233,8 +247,42 @@ class Z3Translator:
         else:
             raise NotImplementedError(f"Unsupported exponential form: base={base}, exponent={exponent}")
 
-    def decompose_to_linear_combination(self,expr):
-        expanded_expr = sp.expand(expr)
+    def _apply_n_sub_to_factor(self, factor, n_sub):
+        n = self.n
+
+        if factor.is_Number:
+            return factor
+        
+        ratio = sp.simplify(n_sub / n)
+        diff = sp.simplify(n - n_sub)
+
+        if factor == sp.log(n):
+            if ratio.is_Rational and ratio > 0:
+                k = 1 / ratio
+                if k.is_Integer and k > 0:
+                    return sp.log(n) - sp.log(k)
+            else:
+                raise ValueError(f"log(n) with substitution {n_sub} not supported")
+
+        if factor.is_Pow:
+            base, exp = factor.as_base_exp()
+            if exp == n and base.is_Number:
+                if diff.is_Rational:
+                    if diff > 0:
+                        k = 1 / diff
+                        if k.is_Integer and k > 0:
+                            return base**n / (base**k)
+                    else:
+                        raise ValueError(f"Non-positive diff in substitution: {n_sub}")
+                    
+        base, exp = factor.as_base_exp()
+        if exp.is_Integer and exp >= 1:
+            return n_sub**exp
+        
+        raise ValueError(f"Unsupported factor for n substitution: {factor}")
+
+    def decompose_to_linear_combination(self, expr, apply_expr: sp.Expr | None = None):
+        expanded_expr = sp.expand(self._to_n_domain(expr))
 
         if expanded_expr.is_Add:
             terms = expanded_expr.args
@@ -283,9 +331,32 @@ class Z3Translator:
         product = list(itertools.product(*factor_chains))
         product = sorted(product, key=lambda x: str(sp.Mul(*x)))
         for combo in product:
+            if apply_expr is not None:
+                new_combo = []
+                for factor in combo:
+                    new_factor = self._apply_n_sub_to_factor(factor, apply_expr)
+                    new_combo.append(new_factor)
+                combo = new_combo
             term = self.translate(sp.Mul(*combo))
-            coeff = z3.Real(f"c_{len(result_terms)}")
+            coeff = z3.Real(f"c_{self.func}_{len(result_terms)}")
             coeffs.append(coeff)
             result_terms.append(coeff * term)
 
         return z3.Sum(result_terms), coeffs
+    
+    def _clone_for_call(self):
+        clone = Z3Translator(func=self.func)
+        clone.cost_expr = self.cost_expr
+        clone.size_expr = self.size_expr
+        return clone
+
+    def get_n_sub_at_call(self, size_subs: Dict[sp.Expr, sp.Expr]) -> sp.Expr:
+        if self.size_expr is None:
+            raise ValueError("size_expr not set on translator")
+
+        call_tr = self._clone_for_call()
+        instantiated_size = call_tr.size_expr.xreplace(size_subs)
+        n = call_tr.n
+        phi_n = instantiated_size.xreplace({self.size_expr: n})
+
+        return sp.simplify(phi_n)
