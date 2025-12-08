@@ -1,12 +1,13 @@
 import sympy as sp
 
+from collections.abc import Callable
 from itertools import product
 from language.lang import *
 from utils.recurrence import RecurrenceBranch, ProgramRecurrence
 from utils.sympy_vars import create_fresh
-from typing import NewType
+from typing import NewType, TypeVar
 
-VariableMap = NewType("VariableMap", dict[str, sp.Expr])
+VariableMap = NewType("VariableMap", dict[str, sp.Expr | None])
 FuncDefs = NewType("FuncDefs", dict[str, tuple[TimeSpec, Expr]])
 
 
@@ -124,86 +125,94 @@ def spec_to_expr(spec: Spec, env: dict[str, sp.Expr]) -> sp.Expr:
 def cost_of_funccall(expr: EFuncCall, env: VariableMap, timespecs: FuncDefs) -> sp.Expr:
     pass
 
+T = TypeVar('T')
+U = TypeVar('U')
+def bind_opt(val: T | None, func: Callable[[T], U | None]) -> U | None:
+    if val is None:
+        return None
+    else:
+        return func(val)
 
-def expr_cost_spec(expr: Expr, env: VariableMap, funcs: FuncDefs) -> list[sp.Expr]:
+def expr_cost_spec(expr: Expr, env: VariableMap, funcs: FuncDefs) -> tuple[sp.Expr | None, list[sp.Expr]]:
     match expr:
-        case EInt(_) | EBool(_) | EVar(_) | ENil() | ECons(_):
-            return [sp.sympify(1)]
+        case EInt(x) | EBool(x):
+            return sp.sympify(x), [sp.sympify(1)]
+        case EVar(var):
+            return env[var], [sp.sympify(1)]
+        case ENil():
+            return sp.sympify(1), [sp.sympify(1)]
+        case ECons(body):
+            body_value, body_costs = expr_cost_spec(body, env, funcs)
+            value = bind_opt(body_value, lambda x: x + 1)
+            costs = [x + 1 for x in body_costs]
+            return value, costs
         case EFuncDef(_) | EMeasureDef(_):
             assert False, "not allowed in function body"
         case ENot(body):
-            return [x + 1 for x in expr_cost_spec(body, env, funcs)]
-        case EBinOp(_, left, right):
-            left = expr_cost_spec(left, env, funcs)
-            right = expr_cost_spec(right, env, funcs)
-            return [x + y + 1 for x, y in product(left, right)]
+            body_val, body_costs = expr_cost_spec(body, env, funcs)
+            value = bind_opt(body_val, lambda x: x + 1)
+            costs = [x + 1 for x in body_costs]
+            return value, costs
+        case EBinOp(op, left, right):
+            left_value, left_costs = expr_cost_spec(left, env, funcs)
+            right_value, right_costs = expr_cost_spec(right, env, funcs)
+            value = eval_binop(op, left_value, right_value)
+            costs = [x + y + 1 for x, y in product(left_costs, right_costs)]
+            return value, costs
         case EIte(cond, then, els):
-            then = expr_cost_spec(then, env, funcs)
-            els = expr_cost_spec(els, env, funcs)
-            return then + els
+            # TODO: implement computing the value of a conditional
+            _, cond_costs = expr_cost_spec(cond, env, funcs)
+            _, then_costs = expr_cost_spec(then, env, funcs)
+            _, els_costs = expr_cost_spec(els, env, funcs)
+            return None, [x + y + z for x, y, z in product(cond_costs, then_costs, els_costs)]
         case ELet(rec, ident, typ, value, body):
             assert not rec, "recursive inner let not allowed"
-            value = expr_cost_spec(value, env, funcs)
-            body = expr_cost_spec(body, env, funcs)
+            value_value, value_costs = expr_cost_spec(value, env, funcs)
+            new_env = env.copy()
+            new_env[ident] = value_value
+            body_value, body_costs = expr_cost_spec(body, new_env, funcs)
+            return body_value, [x + y for x, y in product(value_costs, body_costs)]
             return [x + y for x, y in product(value, body)]
         case EFunc(_):
             assert False, "local functions not supported"
         case EFuncCall(_):
-            return [cost_of_funccall(expr, env, funcs)]
+            return None, [cost_of_funccall(expr, env, funcs)]
         case EMatch(_):
             # TODO: match on len
             assert False, "unimpl"
 
-
-def expr_to_symb(expr: Expr, env: dict[str, sp.Expr]) -> sp.Expr:
-    match expr:
-        case EBool(x):
-            return sp.sympify(x)
-        case EInt(x):
-            return sp.sympify(x)
-        case ENot(body):
-            return ~expr_to_symb(body, env)
-        case EBinOp(op, left, right):
-            left = expr_to_symb(left, env)
-            right = expr_to_symb(right, env)
-            match op:
-                case EBinOpKinds.ADD:
-                    return left + right
-                case EBinOpKinds.SUB:
-                    return left - right
-                case EBinOpKinds.MUL:
-                    return left * right
-                case EBinOpKinds.DIV:
-                    return left / right
-                case EBinOpKinds.MOD:
-                    return left % right
-                case EBinOpKinds.POW:
-                    return left**right
-                case EBinOpKinds.EQ:
-                    return sp.Eq(left, right)
-                case EBinOpKinds.NEQ:
-                    return ~sp.Eq(left, right)
-                case EBinOpKinds.LE:
-                    return left < right
-                case EBinOpKinds.GE:
-                    return left > right
-                case EBinOpKinds.LEQ:
-                    return left <= right
-                case EBinOpKinds.GEQ:
-                    return left >= right
-                case EBinOpKinds.AND:
-                    return left & right
-                case EBinOpKinds.OR:
-                    return left | right
-        case EVar(ident):
-            return env[ident]
-        case ELet(rec, ident, typ, value, body):
-            value = expr_to_symb(value, env)
-            new_env = env.copy()
-            new_env[ident] = value
-            return expr_to_symb(body, new_env)
-        case _:
-            return None
+def eval_binop(op: EBinOpKinds, left: sp.Expr | None, right: sp.Expr | None) -> sp.Expr | None:
+    if left is None or right is None:
+        return None
+    match op:
+        case EBinOpKinds.ADD:
+            return left + right
+        case EBinOpKinds.SUB:
+            return left - right
+        case EBinOpKinds.MUL:
+            return left * right
+        case EBinOpKinds.DIV:
+            return left / right
+        case EBinOpKinds.MOD:
+            return left % right
+        case EBinOpKinds.POW:
+            return left**right
+        case EBinOpKinds.EQ:
+            return sp.Eq(left, right)
+        case EBinOpKinds.NEQ:
+            return ~sp.Eq(left, right)
+        case EBinOpKinds.LE:
+            return left < right
+        case EBinOpKinds.GE:
+            return left > right
+        case EBinOpKinds.LEQ:
+            return left <= right
+        case EBinOpKinds.GEQ:
+            return left >= right
+        case EBinOpKinds.AND:
+            return left & right
+        case EBinOpKinds.OR:
+            return left | right
 
 
 def function_generate_vcs(
