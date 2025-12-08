@@ -14,12 +14,20 @@ class Z3Translator:
         self.subs_target: Optional[sp.Expr] = None
     
     def set_size_definition(self, size_expr: sp.Expr):
-        free_vars = list(size_expr.free_symbols)
+        free_vars = set(size_expr.free_symbols)
+
+        func_terms = [t for t in size_expr.atoms(sp.Function)]
+
+        symbols_in_funcs = set()
+        for fcall in func_terms:
+            symbols_in_funcs |= fcall.free_symbols
+
+        free_vars = (free_vars | set(func_terms)) - symbols_in_funcs
         
         if not free_vars:
             return
         
-        free_vars.sort(key=lambda s: s.name)
+        free_vars = sorted(free_vars, key=lambda s: s.name)
         
         eq = sp.Eq(self.n, size_expr)
         for target_var in free_vars:
@@ -33,12 +41,31 @@ class Z3Translator:
                 continue
     
     def _to_n_domain(self, expr: sp.Expr) -> sp.Expr:
-        if self.subs_source is not None and self.subs_target is not None:
+        # if self.subs_source is not None and self.subs_target is not None:
+        #     if self.subs_source in expr.free_symbols:
+        #         new_expr = expr.subs(self.subs_source, self.subs_target)
+        #         return sp.simplify(new_expr)
+        # return expr
+        if self.subs_source is None or self.subs_target is None:
+            return expr
+
+        need_substitute = False
+        if isinstance(self.subs_source, sp.Symbol):
             if self.subs_source in expr.free_symbols:
-                new_expr = expr.subs(self.subs_source, self.subs_target)
-                return sp.simplify(new_expr)
-        return expr
+                need_substitute = True
+        else:
+            if expr.has(self.subs_source):
+                need_substitute = True
+
+        if not need_substitute:
+            return expr
         
+
+        new_expr = expr.subs(self.subs_source, self.subs_target)
+
+        print(f"Substituting {self.subs_source} with {self.subs_target} in {expr} -> {new_expr}")
+        return sp.simplify(new_expr)
+            
     def _is_pure_n(self, expr: sp.Expr) -> bool:
         syms = expr.free_symbols
         if not syms or (len(syms) == 1 and self.n in syms):
@@ -254,9 +281,7 @@ class Z3Translator:
         result_terms = []
         coeffs = []
         product = list(itertools.product(*factor_chains))
-        print(product)
         product = sorted(product, key=lambda x: str(sp.Mul(*x)))
-        print(product)
         for combo in product:
             term = self.translate(sp.Mul(*combo))
             coeff = z3.Real(f"c_{len(result_terms)}")
