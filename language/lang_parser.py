@@ -178,6 +178,8 @@ class TCamlTransformer(Transformer):
                 return SPBool(value)
             case ("not", body):
                 return SPNot(body)
+            case ("log", body):
+                return SPLog(body)
             case (left, op, right) if is_spbinop(op):
                 return SPBinOp(SPBinOpKinds(op), left, right)
             case ("forall", idents, ".", spec):

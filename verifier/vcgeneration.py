@@ -75,8 +75,12 @@ def arguments_to_env_and_info(
         match typ:
             case TFunc(ident, arg_type, ret, time):
                 match arg_type:
-                    case TRefinement(_, dtyp, _) | TBase(dtyp):
-                        assert isinstance(dtyp, DeltaInt), "non-int unimplemented"
+                    case TRefinement(_, dtype, _) | TBase(dtype):
+                        assert (
+                            isinstance(dtype, DeltaInt)
+                            or isinstance(dtype, DeltaList)
+                            or isinstance(dtype, DeltaArray)
+                        )
                         cur_var = create_fresh(f"{funcname}_{ident}")
                     case _:
                         assert False, "unimpl"
@@ -151,9 +155,8 @@ def spec_to_expr(spec: Spec, env: VariableMap) -> sp.Expr:
             return sp.log(spec_to_expr(body, env), 2)
         case SPForAll(_) | SPExists(_):
             assert False, "unimpl"
-        case SPMeasureCall(_):
-            # TODO: impl len at least
-            assert False, "unimpl"
+        case SPMeasureCall(SPVar("len"), body):
+            return spec_to_expr(body, env)
         case SPIte(cond, then, els):
             cond = spec_to_expr(cond, env)
             then = spec_to_expr(then, env)

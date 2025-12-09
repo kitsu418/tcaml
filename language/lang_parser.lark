@@ -39,9 +39,9 @@ args : arg+
 !espec_init : ident | number | bool
             | "(" espec ")"
 
-!?espec0 : espec0 espec_init
-         | "not" espec_init
+!?espec0 : "not" espec_init
          | "log" espec_init
+         | espec0 espec_init
          | espec_init
 
 !?espec1 : espec0 "^" espec1
