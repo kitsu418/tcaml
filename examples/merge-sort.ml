@@ -14,21 +14,21 @@ let rec merge (l1: int list) (l2: int list): {v: int list | len v = len l1 + len
   match l1 with
   | [] -> l2
   | h1 :: t1 -> 
-      match l2 with
+      (match l2 with
       | [] -> l1
       | h2 :: t2 ->
           if h1 <= h2 then
             h1 :: merge t1 l2
           else
-            h2 :: merge l1 t2;
+            h2 :: merge l1 t2);
 
 let rec mergesort (l: {v: int list | len v >= 0}): {v: int list | len v = len l} @ O(len l * log(len l)) measure [len l] =
   match l with
   | [] -> []
   | _ :: [] -> l
   | _ ->
-    let l1 = split1 l in
-    let l2 = split2 l in
-    let sorted1 = mergesort l1 in
-    let sorted2 = mergesort l2 in
+    let l1: int list = split1 l in
+    let l2: int list = split2 l in
+    let sorted1: int list = mergesort l1 in
+    let sorted2: int list = mergesort l2 in
     merge sorted1 sorted2

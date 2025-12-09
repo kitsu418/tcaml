@@ -267,10 +267,40 @@ def expr_cost_spec(
             return expr_cost_spec(body, env, funcs)
         case EFuncCall(_):
             return None, cost_of_funccall(expr, env, funcs)
-        case EMatch(_):
-            # TODO: match on len
-            assert False, "unimpl"
+        case EMatch(value, clauses):
+            value_value, value_costs = expr_cost_spec(value, env, funcs)
+            paths: list[list[FuncCall]] = []
+            for clause in clauses:
+                local_env = VariableMap(env.copy())
+                match clause.pat:
+                    case PCons(PVar(hd), PVar(tl)):
+                        local_env[hd] = None
+                        local_env[tl] = bind_opt(value_value, lambda x: x - 1)
+                    case PCons(PVar(hd1), PCons(PVar(hd2), PVar(tl))):
+                        local_env[hd1] = None
+                        local_env[hd2] = None
+                        local_env[tl] = bind_opt(value_value, lambda x: x - 2)
+                    case _:
+                        pvars = get_all_pvars(clause.pat)
+                        for var in pvars:
+                            local_env[var] = None
+                _, local_costs = expr_cost_spec(clause.expr, local_env, funcs)
+                paths.extend(merge_product(value_costs, local_costs))
+            return None, paths
     assert False, f"{expr} is unmatched"
+
+
+def get_all_pvars(pat: Pattern) -> list[str]:
+    match pat:
+        case PVar(ident):
+            return [ident]
+        case PAny() | PInt(_) | PBool(_) | PNil():
+            return []
+        case PCons(hd, tl):
+            return get_all_pvars(hd) + get_all_pvars(tl)
+        case PPair(l, r):
+            return get_all_pvars(l) + get_all_pvars(r)
+    assert False, "unimpl"
 
 
 def eval_binop(
