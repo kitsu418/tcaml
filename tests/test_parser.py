@@ -19,7 +19,9 @@ from language.lang_parser import parse
         (
             "(v: int) -> int @ 1 measure 1",
             "type",
-            TFunc("v", TBase(DeltaInt()), TBase(DeltaInt()), TSExact(SPInt(1), SPInt(1))),
+            TFunc(
+                "v", TBase(DeltaInt()), TBase(DeltaInt()), TSExact(SPInt(1), SPInt(1))
+            ),
         ),
         (
             "{v: int | v >= 2}",
@@ -29,7 +31,7 @@ from language.lang_parser import parse
             ),
         ),
         (
-            "match xs with [] -> 0 | _ -> 1",
+            "match xs with | [] -> 0 | _ -> 1",
             "expr",
             EMatch(
                 EVar("xs"),
@@ -50,7 +52,12 @@ from language.lang_parser import parse
             ELet(
                 True,
                 "f",
-                TFunc("x", TBase(DeltaInt()), TBase(DeltaInt()), TSBigO(SPInt(1), SPInt(1))),
+                TFunc(
+                    "x",
+                    TBase(DeltaInt()),
+                    TBase(DeltaInt()),
+                    TSBigO(SPInt(1), SPInt(1)),
+                ),
                 EFunc(
                     "x", TBase(DeltaInt()), EBinOp(EBinOpKinds("+"), EVar("x"), EInt(1))
                 ),
