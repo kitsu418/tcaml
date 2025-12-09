@@ -17,9 +17,9 @@ from language.lang_parser import parse
         ),
         ("int", "delta", DeltaInt()),
         (
-            "(v: int) -> int @ 1",
+            "(v: int) -> int @ 1 measure 1",
             "type",
-            TFunc("v", TBase(DeltaInt()), TBase(DeltaInt()), TSExact(SPInt(1))),
+            TFunc("v", TBase(DeltaInt()), TBase(DeltaInt()), TSExact(SPInt(1), SPInt(1))),
         ),
         (
             "{v: int | v >= 2}",
@@ -45,12 +45,12 @@ from language.lang_parser import parse
             ECons(EInt(1), ECons(EBinOp(EBinOpKinds("+"), EInt(2), EInt(3)), ENil())),
         ),
         (
-            "let rec f : (x: int) -> int @ O(1) = fun (x: int) -> x + 1 in f 1",
+            "let rec f : (x: int) -> int @ O(1) measure 1 = fun (x: int) -> x + 1 in f 1",
             "expr",
             ELet(
                 True,
                 "f",
-                TFunc("x", TBase(DeltaInt()), TBase(DeltaInt()), TSBigO(SPInt(1))),
+                TFunc("x", TBase(DeltaInt()), TBase(DeltaInt()), TSBigO(SPInt(1), SPInt(1))),
                 EFunc(
                     "x", TBase(DeltaInt()), EBinOp(EBinOpKinds("+"), EVar("x"), EInt(1))
                 ),
@@ -151,12 +151,12 @@ def test_parse_exprs(program: str, start: str, expected: Expr) -> None:
     "sugar,unsugared",
     [
         (
-            "let f (x : int) : int @ O(n) = x + 1",
-            "let f : (x : int) -> int @ O(n) = fun (x : int) -> x + 1",
+            "let f (x : int) : int @ O(n) measure n = x + 1",
+            "let f : (x : int) -> int @ O(n) measure n = fun (x : int) -> x + 1",
         ),
         (
-            "let f (x : int) (y : int) : int @ O(n) = x + y",
-            "let f : (x : int) -> ((y : int) -> int @ O(n)) @ O(1) = fun (x : int) -> fun (y : int) -> x + y",
+            "let f (x : int) (y : int) : int @ O(n) measure n = x + y",
+            "let f : (x : int) -> ((y : int) -> int @ O(n) measure n) @ O(1) measure 1 = fun (x : int) -> fun (y : int) -> x + y",
         ),
     ],
 )

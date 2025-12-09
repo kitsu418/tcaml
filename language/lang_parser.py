@@ -79,11 +79,11 @@ class TCamlTransformer(Transformer):
         else:
             rec = False
             _, ident, _, typ, _, body = tree
-        return ident.value, EFuncDef(rec, typ, body)
+        return ident, EFuncDef(rec, typ, body)
 
     def measuredef(self, tree) -> tuple[str, Expr]:
         _, ident, _, inp, _, typ, _, _, ret, _, body = get_values(tree)
-        return ident.value, EMeasureDef(inp, TBaseFunc(typ, ret), body)
+        return ident, EMeasureDef(inp, TBaseFunc(typ, ret), body)
 
     def sugardef(self, tree) -> tuple[str, Expr]:
         if tree[1].value == "rec":
