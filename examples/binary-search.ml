@@ -1,4 +1,4 @@
-let rec search (nums: int array) (l: int) (r: int): int @ O(log (r - l)) measure (r - l) =
+let rec search (nums: int array) (l: int) (r: int) (x: int): int @ O(log (r - l)) measure [r - l] =
   if l > r then
     -1
   else
@@ -6,11 +6,11 @@ let rec search (nums: int array) (l: int) (r: int): int @ O(log (r - l)) measure
     let v: int = readArray nums m in
     if x = v then
       m
-    else if x < v then
-      search nums l (m - 1)
+    else (if x < v then
+      search nums l (m - 1) x
     else
-      search nums (m + 1) r;
+      search nums (m + 1) r x);
 
-let binary_search (nums: int array) (x: int): int @ O(log (len nums)) measure (len nums) = 
+let binary_search (nums: int array) (x: int): int @ O(log (len nums)) measure [len nums] = 
   let n: int = len nums in
-  search nums 0 (n - 1)
+  search nums 0 (n - 1) x
