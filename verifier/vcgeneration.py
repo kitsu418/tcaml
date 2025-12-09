@@ -23,27 +23,42 @@ class FuncCall:
     args: FuncArgsMap
 
 
+@dataclass(frozen=True, slots=True, eq=True)
+class FunctionTest:
+    name: str
+    info: FuncInfo
+    paths: list[list[FuncCall]]
+
+
 FuncDefs = NewType("FuncDefs", dict[str, FuncInfo])
 VariableMap = NewType("VariableMap", dict[str, sp.Expr | None])
 
 
-def program_generate_vcs(prog: Program) -> ProgramRecurrence:
+def program_generate_vcs(prog: Program) -> list[FunctionTest]:
     env = VariableMap({})
     funcs = FuncDefs({})
-    constraints = sp.sympify(True)
+    result: list[FunctionTest] = []
 
     for name, val in prog:
         match val:
             case EMeasureDef(_):
                 assert False, "custom measures not supported yet"
-            case EFuncDef(rec, typ, body):
+            case EFuncDef(rec, typ, _):
                 assert isinstance(typ, TFunc)
 
-                arg_env, arg_constraint = arguments_to_env(body)
-                timespec = timespec_to_sympy(typ.time, arg_env)
-                local_costs = expr_cost_spec(body, env, funcs)
+                arg_env, func_info = arguments_to_env_and_info(name, val, env)
+                exec_body = get_program_body(val)
 
-    return ProgramRecurrence()
+                if rec:
+                    funcs[name] = func_info
+
+                _, paths = expr_cost_spec(exec_body, arg_env, funcs)
+                result.append(FunctionTest(name, func_info, paths))
+
+                if not rec:
+                    funcs[name] = func_info
+
+    return result
 
 
 # returns environment after introducing all arguments
@@ -81,6 +96,13 @@ def arguments_to_env_and_info(
 
     info = FuncInfo(args, last_spec_expr, last_size_expr)
     return env, info
+
+
+def get_program_body(func: EFuncDef) -> Expr:
+    body = func.body
+    while isinstance(body, EFunc):
+        body = body.ret
+    return body
 
 
 def spec_to_expr(spec: Spec, env: VariableMap) -> sp.Expr:
@@ -137,6 +159,7 @@ def spec_to_expr(spec: Spec, env: VariableMap) -> sp.Expr:
             then = spec_to_expr(then, env)
             els = spec_to_expr(els, env)
             return (cond >> then) & ((~cond) >> els)
+    assert False, f"{spec} unimpl"
 
 
 def bind_opt[T, U](val: T | None, func: Callable[[T], U | None]) -> U | None:
@@ -171,6 +194,7 @@ def cost_of_funccall(
             case _:
                 assert False, "unimpl"
 
+    assert len(args) == len(arg_values), "partial application not allowed"
     argmap = FuncArgsMap({arg: value for arg, value in zip(args, arg_values)})
     this_call = FuncCall(fname, argmap)
     return merge_product([[this_call]], costs)
