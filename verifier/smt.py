@@ -248,6 +248,9 @@ class Z3Translator:
             raise NotImplementedError(f"Unsupported exponential form: base={base}, exponent={exponent}")
 
     def _apply_n_sub_to_factor(self, factor, n_sub):
+        if factor.is_Number or factor.is_constant():
+            return factor
+
         n = self.n
 
         if factor.is_Number:
@@ -318,7 +321,9 @@ class Z3Translator:
             chain = []
             base, exp = factor.as_base_exp()
 
-            if exp.is_Integer and exp > 0:
+            if expr.is_constant():
+                chain.append(factor)
+            elif exp.is_Integer and exp > 0:
                 for k in range(int(exp) + 1):
                     chain.append(base**k)
             else:
@@ -329,7 +334,7 @@ class Z3Translator:
         result_terms = []
         coeffs = []
         product = list(itertools.product(*factor_chains))
-        product = sorted(product, key=lambda x: str(sp.Mul(*x)))
+        product = sorted(product, key=lambda x: float(sp.Mul(*x).subs(self.n, 1000).evalf()))
         for combo in product:
             if apply_expr is not None:
                 new_combo = []
