@@ -1,13 +1,20 @@
 import sympy as sp
 
 from collections.abc import Callable
-from itertools import product
 from language.lang import *
-from utils.recurrence import RecurrenceBranch, ProgramRecurrence
+from language.lang_parser import parse
 from utils.sympy_vars import create_fresh
 from typing import NewType
 
 FuncArgsMap = NewType("FuncArgsMap", dict[sp.Expr, sp.Expr | None])
+
+# use fake function definitions that don't typecheck, just for parsing purposes
+stdlib_src = """
+let readArray (xs: 'a array) (idx: int): 'a @ O(1) measure [1] = 0;
+let writeArray (xs: 'a array) (idx: int) (val: 'a): {v: 'a array | len v = len xs} @ O(len xs) measure [len xs] = 0;
+let readList (xs: 'a list) (idx: int): 'a @ O(len xs) measure [len xs] = 0;
+let newArray (length: int) (init: 'a): {v: 'a array | len v = length} @ O(1) measure [1] = 0
+"""
 
 
 @dataclass(frozen=True, slots=True, eq=True)
@@ -35,8 +42,14 @@ VariableMap = NewType("VariableMap", dict[str, sp.Expr | None])
 
 
 def program_generate_vcs(prog: Program) -> list[FunctionTest]:
+    stdlib: Program = parse(stdlib_src)  # type: ignore
     env = VariableMap({})
     funcs = FuncDefs({})
+    for name, val in stdlib:
+        assert isinstance(val, EFuncDef)
+        _, func_info = arguments_to_env_and_info(name, val, env)
+        funcs[name] = func_info
+
     result: list[FunctionTest] = []
 
     for name, val in prog:
@@ -78,9 +91,10 @@ def arguments_to_env_and_info(
                     case TRefinement(_, dtype, _) | TBase(dtype):
                         assert (
                             isinstance(dtype, DeltaInt)
+                            or isinstance(dtype, DeltaParam)
                             or isinstance(dtype, DeltaList)
                             or isinstance(dtype, DeltaArray)
-                        )
+                        ), f"dtype is {dtype}"
                         cur_var = create_fresh(f"{funcname}_{ident}")
                     case _:
                         assert False, "unimpl"
@@ -249,6 +263,8 @@ def expr_cost_spec(
             return body_value, body_costs
         case EFunc(_):
             assert False, "local functions not supported"
+        case EFuncCall(EVar("len"), body):
+            return expr_cost_spec(body, env, funcs)
         case EFuncCall(_):
             return None, cost_of_funccall(expr, env, funcs)
         case EMatch(_):

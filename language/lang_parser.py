@@ -115,6 +115,8 @@ class TCamlTransformer(Transformer):
                 return DeltaInt()
             case ("bool",):
                 return DeltaBool()
+            case ("'a",):
+                return DeltaParam()
             case ("(", typ, ")"):
                 return typ
             case (typ, "list"):
@@ -161,9 +163,9 @@ class TCamlTransformer(Transformer):
 
     def cspec(self, tree) -> TimeSpec:
         match get_values(tree):
-            case (espec, "measure", size):
+            case (espec, "measure", "[", size, "]"):
                 return TSExact(espec, size)
-            case ("O(", espec, ")", "measure", size):
+            case ("O(", espec, ")", "measure", "[", size, "]"):
                 return TSBigO(espec, size)
         raise TCamlParserException(f"no match on time expression {tree}")
 
