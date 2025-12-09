@@ -283,11 +283,13 @@ class SPIte(Spec):
 @dataclass(frozen=True, slots=True, eq=True)
 class TSExact(TimeSpec):
     spec: Spec
+    size: Spec
 
 
 @dataclass(frozen=True, slots=True, eq=True)
 class TSBigO(TimeSpec):
     spec: Spec
+    size: Spec
 
 
 # Clauses and Patterns

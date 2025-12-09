@@ -97,7 +97,7 @@ class TCamlTransformer(Transformer):
         fn_type = TFunc(last_ident, last_typ, typ, cspec)
         body = EFunc(last_ident, last_typ, body)
         for ident, typ in reversed(args[:-1]):
-            fn_type = TFunc(ident, typ, fn_type, TSBigO(SPInt(1)))
+            fn_type = TFunc(ident, typ, fn_type, TSBigO(SPInt(1), SPInt(1)))
             body = EFunc(ident, typ, body)
         return fname.value, EFuncDef(rec, fn_type, body)
 
@@ -161,10 +161,10 @@ class TCamlTransformer(Transformer):
 
     def cspec(self, tree) -> TimeSpec:
         match get_values(tree):
-            case (espec,):
-                return TSExact(espec)
-            case ("O(", espec, ")"):
-                return TSBigO(espec)
+            case (espec, "measure", size):
+                return TSExact(espec, size)
+            case ("O(", espec, ")", "measure", size):
+                return TSBigO(espec, size)
         raise TCamlParserException(f"no match on time expression {tree}")
 
     def espec_parser(self, tree) -> Spec:

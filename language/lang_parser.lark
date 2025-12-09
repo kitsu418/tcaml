@@ -31,8 +31,8 @@ args : arg+
       | "(" ident ":" type ")" "->" "(" type ")" "@" cspec
       | delta "->" delta
 
-!cspec : "O(" espec ")"
-       | espec
+!cspec : "O(" espec ")" "measure" espec
+       | espec "measure" espec
 
 ?espec : espec9
 

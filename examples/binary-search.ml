@@ -1,4 +1,4 @@
-let rec search (nums: int array) (l: int) (r: int): int @ O(log (r - l)) =
+let rec search (nums: int array) (l: int) (r: int): int @ O(log (r - l)) measure (r - l) =
   if l > r then
     -1
   else
@@ -11,6 +11,6 @@ let rec search (nums: int array) (l: int) (r: int): int @ O(log (r - l)) =
     else
       search nums (m + 1) r;
 
-let binary_search (nums: int array) (x: int): int @ O(log (len nums)) = 
+let binary_search (nums: int array) (x: int): int @ O(log (len nums)) measure (len nums) = 
   let n: int = len nums in
   search nums 0 (n - 1)

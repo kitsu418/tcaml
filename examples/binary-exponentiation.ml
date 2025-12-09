@@ -1,4 +1,4 @@
-let rec binExpo (a: int) (n: int) : int @ O(log n) = 
+let rec binExpo (a: int) (n: int) : int @ O(log n) measure n = 
   if n = 0 then
     1 
   else 
