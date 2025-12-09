@@ -18,12 +18,14 @@ class Type:
     pass
 
 
-class TimeSpec:
-    pass
-
-
 class Spec:
     pass
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class TimeSpec:
+    spec: Spec
+    size: Spec
 
 
 class Pattern:
@@ -282,14 +284,12 @@ class SPIte(Spec):
 
 @dataclass(frozen=True, slots=True, eq=True)
 class TSExact(TimeSpec):
-    spec: Spec
-    size: Spec
+    pass
 
 
 @dataclass(frozen=True, slots=True, eq=True)
 class TSBigO(TimeSpec):
-    spec: Spec
-    size: Spec
+    pass
 
 
 # Clauses and Patterns

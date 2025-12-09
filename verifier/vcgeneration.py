@@ -46,38 +46,41 @@ def program_generate_vcs(prog: Program) -> ProgramRecurrence:
     return ProgramRecurrence()
 
 
-# returns environment and constraints on those arguments
-def arguments_to_env(body: Expr) -> tuple[VariableMap, sp.Expr]:
-    def helper(
-        body: Expr, env: VariableMap, constraint: sp.Expr
-    ) -> tuple[VariableMap, sp.Expr]:
-        match body:
-            case EFunc(ident, typ, ret):
-                match typ:
-                    case TRefinement(inner_ident, dtyp, spec):
+# returns environment after introducing all arguments
+# also collects argument information to construct FuncInfo
+def arguments_to_env_and_info(
+    funcname: str, expr: EFuncDef, env: VariableMap
+) -> tuple[VariableMap, FuncInfo]:
+    args: list[sp.Expr] = []
+    typ = expr.typ
+    last_spec: Spec | None = None
+    last_size: Spec | None = None
+
+    while True:
+        match typ:
+            case TFunc(ident, arg_type, ret, time):
+                match arg_type:
+                    case TRefinement(_, dtyp, _) | TBase(dtyp):
                         assert isinstance(dtyp, DeltaInt), "non-int unimplemented"
-                        cur_var = create_fresh(ident)
-                        local_env = VariableMap(env.copy())
-                        local_env[inner_ident] = cur_var
-                        local_constraint = spec_to_expr(spec, local_env)
-                        constraint = constraint & local_constraint
-                    case TBase(dtyp):
-                        assert isinstance(dtyp, DeltaInt), "non-int unimplemented"
-                        cur_var = create_fresh(ident)
+                        cur_var = create_fresh(f"{funcname}_{ident}")
                     case _:
                         assert False, "unimpl"
 
+                args.append(cur_var)
+                env = VariableMap(env.copy())
                 env[ident] = cur_var
-                return helper(ret, env, constraint)
+                last_spec = time.spec
+                last_size = time.size
+                typ = ret
             case _:
-                return env, constraint
+                break
 
-    return helper(body, VariableMap({}), sp.sympify(True))
+    assert last_spec is not None and last_size is not None
+    last_spec_expr = spec_to_expr(last_spec, env)
+    last_size_expr = spec_to_expr(last_size, env)
 
-
-def timespec_to_sympy(spec: TimeSpec, env: VariableMap) -> sp.Expr:
-    assert isinstance(spec, TSBigO), "concrete unimplemented"
-    return spec_to_expr(spec.spec, env)
+    info = FuncInfo(args, last_spec_expr, last_size_expr)
+    return env, info
 
 
 def spec_to_expr(spec: Spec, env: VariableMap) -> sp.Expr:
