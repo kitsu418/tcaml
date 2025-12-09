@@ -2,8 +2,8 @@ let rec binExpo (a: int) (n: int) : int @ O(log n) =
   if n = 0 then
     1 
   else 
-    let mul: int = binExpo a (n / 2) in 
-    if (n mod 2) == 1 then
+    let mul = binExpo a (n / 2) in 
+    if (n mod 2) = 1 then
       a * mul * mul 
     else
       mul * mul

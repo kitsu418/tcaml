@@ -123,7 +123,7 @@ args : arg+
        | "match" expr8 "with" clauses
        | expr7
 
-!clauses : pat "->" expr ("|" clauses)?
+!clauses : "|" pat "->" expr clauses?
 
 !pat : ident | "_" | number | bool
      | "[]" | pat "::" pat

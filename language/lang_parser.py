@@ -79,11 +79,11 @@ class TCamlTransformer(Transformer):
         else:
             rec = False
             _, ident, _, typ, _, body = tree
-        return ident, EFuncDef(rec, typ, body)
+        return ident.value, EFuncDef(rec, typ, body)
 
     def measuredef(self, tree) -> tuple[str, Expr]:
         _, ident, _, inp, _, typ, _, _, ret, _, body = get_values(tree)
-        return ident, EMeasureDef(inp, TBaseFunc(typ, ret), body)
+        return ident.value, EMeasureDef(inp, TBaseFunc(typ, ret), body)
 
     def sugardef(self, tree) -> tuple[str, Expr]:
         if tree[1].value == "rec":
@@ -99,7 +99,7 @@ class TCamlTransformer(Transformer):
         for ident, typ in reversed(args[:-1]):
             fn_type = TFunc(ident, typ, fn_type, TSBigO(SPInt(1)))
             body = EFunc(ident, typ, body)
-        return fname, EFuncDef(rec, fn_type, body)
+        return fname.value, EFuncDef(rec, fn_type, body)
 
     def arg(self, tree) -> tuple[str, Type]:
         return get_values(tree)
@@ -273,9 +273,9 @@ class TCamlTransformer(Transformer):
 
     def clauses(self, tree) -> list[Clause]:
         match get_values(tree):
-            case (path, "->", expr):
+            case ("|", path, "->", expr):
                 return [Clause(path, expr)]
-            case (path, "->", expr, "|", rest):
+            case ("|", path, "->", expr, rest):
                 return [Clause(path, expr)] + rest
         raise TCamlParserException(f"no match on clauses expression {tree}")
 

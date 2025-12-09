@@ -21,13 +21,13 @@ let rec sift_down (arr: int array) (root: int): {v: int array | len v = len arr}
        shift_down swapped_arr bigger_child
   else arr;
 
-let heapify (arr: int array): int array @ O((len arr)^2 * log(len arr)) =
-  let rec part (xs: int array) (iter: int): {v: int array | len v = len xs} 
-      @ O((iter + 1) * (len xs) * log(len xs)) =
-    let n: int = len xs in
-    let root: int = n - 1 - iter in
-    if root < 0
-      then xs
-      else part (sift_down xs root) (root - 1)
-  
+let rec part (xs: int array) (iter: int): {v: int array | len v = len xs} 
+    @ O((iter + 1) * (len xs) * log(len xs)) =
+  let n: int = len xs in
+  let root: int = n - 1 - iter in
+  if root < 0
+    then xs
+    else part (sift_down xs root) (root - 1);
 
+let heapify (arr: int array): int array @ O((len arr)^2 * log(len arr)) =
+  part arr 0
