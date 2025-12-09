@@ -1,4 +1,4 @@
-let rec fib (n : {v: int | v >= 1}) : int @ O(2^n) =
+let rec fib (n : {v: int | v >= 1}) : int @ O(2^n) measure n =
   match n with
   | 1 -> 1
   | 2 -> 1

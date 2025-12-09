@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from typing import NewType
 
 
 # Base Types
@@ -17,17 +18,21 @@ class Type:
     pass
 
 
-class TimeSpec:
-    pass
-
-
 class Spec:
     pass
+
+
+@dataclass(frozen=True, slots=True, eq=True)
+class TimeSpec:
+    spec: Spec
+    size: Spec
 
 
 class Pattern:
     pass
 
+
+Program = list[tuple[str, Expr]]
 
 ## Expressions
 
@@ -49,11 +54,6 @@ class EBinOpKinds(Enum):
 
 
 @dataclass(frozen=True, slots=True, eq=True)
-class EDelta(Expr):
-    pass
-
-
-@dataclass(frozen=True, slots=True, eq=True)
 class EInt(Expr):
     value: int
 
@@ -69,12 +69,6 @@ class EVar(Expr):
 
 
 @dataclass(frozen=True, slots=True, eq=True)
-class EMeasure(Expr):
-    left: EDelta
-    right: EDelta
-
-
-@dataclass(frozen=True, slots=True, eq=True)
 class EFuncDef(Expr):
     rec: bool
     typ: Type
@@ -83,9 +77,9 @@ class EFuncDef(Expr):
 
 @dataclass(frozen=True, slots=True, eq=True)
 class EMeasureDef(Expr):
-    inp: DeltaType
-    ret: DeltaType
-    body: Expr
+    inp: str
+    typ: "TBaseFunc"
+    body: Spec
 
 
 @dataclass(frozen=True, slots=True, eq=True)
@@ -165,9 +159,8 @@ class DeltaBool(DeltaType):
 
 
 @dataclass(frozen=True, slots=True, eq=True)
-class DeltaProd(DeltaType):
-    left: DeltaType
-    right: DeltaType
+class DeltaTuple(DeltaType):
+    types: list[DeltaType]
 
 
 @dataclass(frozen=True, slots=True, eq=True)
@@ -275,7 +268,7 @@ class SPExists(Spec):
 
 @dataclass(frozen=True, slots=True, eq=True)
 class SPMeasureCall(Spec):
-    measure: str
+    measure: Spec
     inp: Spec
 
 
@@ -291,12 +284,12 @@ class SPIte(Spec):
 
 @dataclass(frozen=True, slots=True, eq=True)
 class TSExact(TimeSpec):
-    spec: Spec
+    pass
 
 
 @dataclass(frozen=True, slots=True, eq=True)
 class TSBigO(TimeSpec):
-    spec: Spec
+    pass
 
 
 # Clauses and Patterns

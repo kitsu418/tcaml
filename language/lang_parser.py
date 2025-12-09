@@ -35,6 +35,16 @@ def is_ebinop(op: Any) -> bool:
     return False
 
 
+def is_spbinop(op: Any) -> bool:
+    if isinstance(op, str):
+        try:
+            _ = SPBinOpKinds(op)
+            return True
+        except:
+            return False
+    return False
+
+
 class TCamlTransformer(Transformer):
     def __init__(self):
         super(Transformer).__init__()
@@ -48,11 +58,10 @@ class TCamlTransformer(Transformer):
     def ident(self, tree) -> str:
         return tree[0]
 
-    def measure(self, tree) -> Expr:
-        left, _, right = tree
-        return EMeasure(left, right)
+    def idents(self, tree) -> list[str]:
+        return [x.value for x in tree]
 
-    def prog(self, tree) -> list[Expr]:
+    def prog(self, tree) -> Program:
         match get_values(tree):
             case (defn,):
                 return [defn]
@@ -60,7 +69,7 @@ class TCamlTransformer(Transformer):
                 return [defn] + prog
         raise TCamlParserException(f"no match on prog expression {tree}")
 
-    def _def(self, tree) -> tuple[str, Expr]:
+    def defn(self, tree) -> tuple[str, Expr]:
         return tree[0]
 
     def funcdef(self, tree) -> tuple[str, Expr]:
@@ -73,10 +82,32 @@ class TCamlTransformer(Transformer):
         return ident, EFuncDef(rec, typ, body)
 
     def measuredef(self, tree) -> tuple[str, Expr]:
-        _, ident, _, inp, _, ret, _, body = tree
-        return ident, EMeasureDef(inp, ret, body)
+        _, ident, _, inp, _, typ, _, _, ret, _, body = get_values(tree)
+        return ident, EMeasureDef(inp, TBaseFunc(typ, ret), body)
 
-    def delta(self, tree) -> DeltaType:
+    def sugardef(self, tree) -> tuple[str, Expr]:
+        if tree[1].value == "rec":
+            rec = True
+            _, _, fname, args, _, typ, _, cspec, _, body = tree
+        else:
+            rec = False
+            _, fname, args, _, typ, _, cspec, _, body = tree
+
+        last_ident, last_typ = args[-1]
+        fn_type = TFunc(last_ident, last_typ, typ, cspec)
+        body = EFunc(last_ident, last_typ, body)
+        for ident, typ in reversed(args[:-1]):
+            fn_type = TFunc(ident, typ, fn_type, TSBigO(SPInt(1), SPInt(1)))
+            body = EFunc(ident, typ, body)
+        return fname.value, EFuncDef(rec, fn_type, body)
+
+    def arg(self, tree) -> tuple[str, Type]:
+        return get_values(tree)
+
+    def args(self, tree) -> list[tuple[str, Type]]:
+        return tree
+
+    def delta_parser(self, tree) -> DeltaType:
         match get_values(tree):
             case ("()",):
                 return DeltaUnit()
@@ -84,13 +115,25 @@ class TCamlTransformer(Transformer):
                 return DeltaInt()
             case ("bool",):
                 return DeltaBool()
-            case (left, "*", right):
-                return DeltaProd(left, right)
+            case ("(", typ, ")"):
+                return typ
             case (typ, "list"):
                 return DeltaList(typ)
             case (typ, "array"):
                 return DeltaArray(typ)
         raise TCamlParserException(f"no match on delta expression {tree}")
+
+    delta_init = delta_parser
+    delta0 = delta_parser
+
+    # handles pairs
+    def delta1(self, tree) -> DeltaType:
+        vals = get_values(tree)
+        if len(vals) == 1:
+            return vals[0]
+        else:
+            every_other = list(get_values(tree)[::2])
+            return DeltaTuple(every_other)
 
     def type(self, tree) -> Type:
         match get_values(tree):
@@ -98,7 +141,19 @@ class TCamlTransformer(Transformer):
                 return TBase(dtype)
             case ("{", ident, ":", dtype, "|", espec, "}"):
                 return TRefinement(ident, dtype, espec)
-            case ("(", ident, ":", typ, ")", "->", ret, "@", cspec):
+            case ("(", ident, ":", typ, ")", "->", ret, "@", cspec) | (
+                "(",
+                ident,
+                ":",
+                typ,
+                ")",
+                "->",
+                "(",
+                ret,
+                ")",
+                "@",
+                cspec,
+            ):
                 return TFunc(ident, typ, ret, cspec)
             case (inp, "->", ret):
                 return TBaseFunc(inp, ret)
@@ -106,14 +161,15 @@ class TCamlTransformer(Transformer):
 
     def cspec(self, tree) -> TimeSpec:
         match get_values(tree):
-            case (espec,):
-                return TSExact(espec)
-            case ("O(", espec, ")"):
-                return TSBigO(espec)
+            case (espec, "measure", size):
+                return TSExact(espec, size)
+            case ("O(", espec, ")", "measure", size):
+                return TSBigO(espec, size)
         raise TCamlParserException(f"no match on time expression {tree}")
 
-    def espec(self, tree) -> Spec:
-        match get_values(tree):
+    def espec_parser(self, tree) -> Spec:
+        vals = get_values(tree)
+        match vals:
             case (ident,) if is_cname(ident):
                 return SPVar(ident)
             case (value,) if isinstance(value, int):
@@ -122,8 +178,8 @@ class TCamlTransformer(Transformer):
                 return SPBool(value)
             case ("not", body):
                 return SPNot(body)
-            case (left, op, right) if isinstance(op, SPBinOpKinds):
-                return SPBinOp(op, left, right)
+            case (left, op, right) if is_spbinop(op):
+                return SPBinOp(SPBinOpKinds(op), left, right)
             case ("forall", idents, ".", spec):
                 cur = spec
                 for ident in reversed(idents):
@@ -140,13 +196,27 @@ class TCamlTransformer(Transformer):
                 return SPIte(cond, then, els)
             case ("(", body, ")"):
                 return body
+
+        if vals and vals[0] == "forall":
+            dot_idx = vals.index(".")
+            if dot_idx != -1 and dot_idx + 1 < len(vals):
+                idents = vals[1:dot_idx]
+                # spec = vals[
         raise TCamlParserException(f"no match on espec expression {tree}")
 
-    def opspec(self, tree) -> SPBinOpKinds:
-        return SPBinOpKinds(tree[0])
+    espec_init = espec_parser
+    espec0 = espec_parser
+    espec1 = espec_parser
+    espec2 = espec_parser
+    espec3 = espec_parser
+    espec4 = espec_parser
+    espec5 = espec_parser
+    espec6 = espec_parser
+    espec7 = espec_parser
+    espec8 = espec_parser
+    espec9 = espec_parser
 
     def expr_parser(self, tree) -> Expr:
-        print(get_values(tree))
         match get_values(tree):
             case (ident,) if is_cname(ident):
                 return EVar(ident)
@@ -203,9 +273,9 @@ class TCamlTransformer(Transformer):
 
     def clauses(self, tree) -> list[Clause]:
         match get_values(tree):
-            case (path, "->", expr):
+            case ("|", path, "->", expr):
                 return [Clause(path, expr)]
-            case (path, "->", expr, "|", rest):
+            case ("|", path, "->", expr, rest):
                 return [Clause(path, expr)] + rest
         raise TCamlParserException(f"no match on clauses expression {tree}")
 
@@ -240,7 +310,6 @@ def construct_lark_parser(start: str) -> Lark:
 
 
 def parse_lark_repr(tree: Tree) -> Expr:
-    print(tree)
     transformer = TCamlTransformer()
     result_tree = transformer.transform(tree)
     return result_tree
@@ -251,3 +320,19 @@ def parse(text: str, start: str | None = None) -> Expr:
         start = "prog"
     parser = construct_lark_parser(start)
     return parse_lark_repr(parser.parse(text))
+
+
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) <= 1:
+        print("usage: python3 language/lang_parser.py <file-name>")
+    else:
+        filename = sys.argv[1]
+        data = None
+        with open(filename, "r") as f:
+            data = f.read()
+        if data is None:
+            print("file missing")
+        else:
+            print(parse(data))
