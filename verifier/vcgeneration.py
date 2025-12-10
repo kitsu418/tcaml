@@ -42,7 +42,7 @@ FuncDefs = NewType("FuncDefs", dict[str, FuncInfo])
 VariableMap = NewType("VariableMap", dict[str, sp.Expr | None])
 
 
-def program_generate_vcs(prog: Program) -> list[FunctionTest]:
+def program_generate_vcs(prog: Program) -> tuple[FuncDefs, list[FunctionTest]]:
     stdlib: Program = parse(stdlib_src)  # type: ignore
     env = VariableMap({})
     funcs = FuncDefs({})
@@ -74,7 +74,7 @@ def program_generate_vcs(prog: Program) -> list[FunctionTest]:
             case _:
                 assert False, "not allowed at top level"
 
-    return result
+    return funcs, result
 
 
 # returns environment after introducing all arguments
