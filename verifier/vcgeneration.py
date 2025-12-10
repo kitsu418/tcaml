@@ -20,6 +20,7 @@ let newArray (length: int) (init: 'a): {v: 'a array | len v = length} @ O(1) mea
 @dataclass(frozen=True, slots=True, eq=True)
 class FuncInfo:
     args: list[sp.Expr]
+    ret: sp.Expr | None
     timespec: sp.Expr
     size: sp.Expr
 
@@ -70,6 +71,8 @@ def program_generate_vcs(prog: Program) -> list[FunctionTest]:
 
                 if not rec:
                     funcs[name] = func_info
+            case _:
+                assert False, "not allowed at top level"
 
     return result
 
@@ -83,6 +86,7 @@ def arguments_to_env_and_info(
     typ = expr.typ
     last_spec: Spec | None = None
     last_size: Spec | None = None
+    ret_value: sp.Expr | None = None
     env = VariableMap(env.copy())
 
     while True:
@@ -105,6 +109,17 @@ def arguments_to_env_and_info(
                 last_spec = time.spec
                 last_size = time.size
                 typ = ret
+            case TRefinement(ident, _, spec):
+                match spec:
+                    case SPBinOp(SPBinOpKinds.EQ, SPVar(ident), right) | SPBinOp(
+                        SPBinOpKinds.EQ,
+                        SPMeasureCall(SPVar("len"), SPVar(ident)),
+                        right,
+                    ):
+                        ret_value = spec_to_expr(right, env)
+                    case _:
+                        pass
+                break
             case _:
                 break
 
@@ -112,7 +127,7 @@ def arguments_to_env_and_info(
     last_spec_expr = spec_to_expr(last_spec, env)
     last_size_expr = spec_to_expr(last_size, env)
 
-    info = FuncInfo(args, last_spec_expr, last_size_expr)
+    info = FuncInfo(args, ret_value, last_spec_expr, last_size_expr)
     return env, info
 
 
@@ -192,7 +207,7 @@ def merge_product[T](xss: list[list[T]], yss: list[list[T]]) -> list[list[T]]:
 
 def cost_of_funccall(
     expr: EFuncCall, env: VariableMap, funcs: FuncDefs
-) -> list[list[FuncCall]]:
+) -> tuple[sp.Expr | None, list[list[FuncCall]]]:
     rev_arg_values: list[sp.Expr | None] = []
     cur: Expr = expr
     costs: list[list[FuncCall]] = [[]]
@@ -216,7 +231,18 @@ def cost_of_funccall(
         {arg: value for arg, value in zip(args, reversed(rev_arg_values))}
     )
     this_call = FuncCall(fname, argmap)
-    return merge_product([[this_call]], costs)
+
+    ret: sp.Expr | None = None
+    if info.ret is not None:
+        ret = info.ret
+        for arg, value in argmap.items():
+            if value is None:
+                value = None
+                break
+            else:
+                ret = ret.subs(arg, value)
+
+    return ret, merge_product([[this_call]], costs)
 
 
 def expr_cost_spec(
@@ -269,7 +295,7 @@ def expr_cost_spec(
             res = expr_cost_spec(body, env, funcs)
             return res
         case EFuncCall(_):
-            return None, cost_of_funccall(expr, env, funcs)
+            return cost_of_funccall(expr, env, funcs)
         case EMatch(value, clauses):
             value_value, value_costs = expr_cost_spec(value, env, funcs)
             paths: list[list[FuncCall]] = []
