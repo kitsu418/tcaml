@@ -83,6 +83,7 @@ def arguments_to_env_and_info(
     typ = expr.typ
     last_spec: Spec | None = None
     last_size: Spec | None = None
+    env = VariableMap(env.copy())
 
     while True:
         match typ:
@@ -100,7 +101,6 @@ def arguments_to_env_and_info(
                         assert False, "unimpl"
 
                 args.append(cur_var)
-                env = VariableMap(env.copy())
                 env[ident] = cur_var
                 last_spec = time.spec
                 last_size = time.size
@@ -280,6 +280,8 @@ def expr_cost_spec(
                         local_env[hd1] = None
                         local_env[hd2] = None
                         local_env[tl] = bind_opt(value_value, lambda x: x - 2)
+                    case PVar(ident):
+                        local_env[ident] = value_value
                     case _:
                         pvars = get_all_pvars(clause.pat)
                         for var in pvars:
