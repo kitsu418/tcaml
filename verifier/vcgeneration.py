@@ -260,11 +260,12 @@ def expr_cost_spec(
             new_env[ident] = value_value
             body_value, body_costs = expr_cost_spec(body, new_env, funcs)
             costs = merge_product(value_costs, body_costs)
-            return body_value, body_costs
+            return body_value, costs
         case EFunc(_):
             assert False, "local functions not supported"
         case EFuncCall(EVar("len"), body):
-            return expr_cost_spec(body, env, funcs)
+            res = expr_cost_spec(body, env, funcs)
+            return res
         case EFuncCall(_):
             return None, cost_of_funccall(expr, env, funcs)
         case EMatch(value, clauses):
