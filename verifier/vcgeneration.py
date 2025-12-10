@@ -193,7 +193,7 @@ def merge_product[T](xss: list[list[T]], yss: list[list[T]]) -> list[list[T]]:
 def cost_of_funccall(
     expr: EFuncCall, env: VariableMap, funcs: FuncDefs
 ) -> list[list[FuncCall]]:
-    arg_values: list[sp.Expr | None] = []
+    rev_arg_values: list[sp.Expr | None] = []
     cur: Expr = expr
     costs: list[list[FuncCall]] = [[]]
 
@@ -201,7 +201,7 @@ def cost_of_funccall(
         match cur:
             case EFuncCall(func, arg):
                 arg_value, arg_costs = expr_cost_spec(arg, env, funcs)
-                arg_values.append(arg_value)
+                rev_arg_values.append(arg_value)
                 costs = merge_product(costs, arg_costs)
                 cur = func
             case EVar(fname):
@@ -211,8 +211,10 @@ def cost_of_funccall(
             case _:
                 assert False, "unimpl"
 
-    assert len(args) == len(arg_values), "partial application not allowed"
-    argmap = FuncArgsMap({arg: value for arg, value in zip(args, arg_values)})
+    assert len(args) == len(rev_arg_values), "partial application not allowed"
+    argmap = FuncArgsMap(
+        {arg: value for arg, value in zip(args, reversed(rev_arg_values))}
+    )
     this_call = FuncCall(fname, argmap)
     return merge_product([[this_call]], costs)
 
