@@ -1,18 +1,26 @@
 import sympy as sp
 
 from collections.abc import Callable
-from itertools import product
 from language.lang import *
-from utils.recurrence import RecurrenceBranch, ProgramRecurrence
+from language.lang_parser import parse
 from utils.sympy_vars import create_fresh
 from typing import NewType
 
 FuncArgsMap = NewType("FuncArgsMap", dict[sp.Expr, sp.Expr | None])
 
+# use fake function definitions that don't typecheck, just for parsing purposes
+stdlib_src = """
+let readArray (xs: 'a array) (idx: int): 'a @ O(1) measure [1] = 0;
+let writeArray (xs: 'a array) (idx: int) (val: 'a): {v: 'a array | len v = len xs} @ O(len xs) measure [len xs] = 0;
+let readList (xs: 'a list) (idx: int): 'a @ O(len xs) measure [len xs] = 0;
+let newArray (length: int) (init: 'a): {v: 'a array | len v = length} @ O(1) measure [1] = 0
+"""
+
 
 @dataclass(frozen=True, slots=True, eq=True)
 class FuncInfo:
     args: list[sp.Expr]
+    ret: sp.Expr | None
     timespec: sp.Expr
     size: sp.Expr
 
@@ -34,9 +42,15 @@ FuncDefs = NewType("FuncDefs", dict[str, FuncInfo])
 VariableMap = NewType("VariableMap", dict[str, sp.Expr | None])
 
 
-def program_generate_vcs(prog: Program) -> list[FunctionTest]:
+def program_generate_vcs(prog: Program) -> tuple[FuncDefs, list[FunctionTest]]:
+    stdlib: Program = parse(stdlib_src)  # type: ignore
     env = VariableMap({})
     funcs = FuncDefs({})
+    for name, val in stdlib:
+        assert isinstance(val, EFuncDef)
+        _, func_info = arguments_to_env_and_info(name, val, env)
+        funcs[name] = func_info
+
     result: list[FunctionTest] = []
 
     for name, val in prog:
@@ -57,8 +71,10 @@ def program_generate_vcs(prog: Program) -> list[FunctionTest]:
 
                 if not rec:
                     funcs[name] = func_info
+            case _:
+                assert False, "not allowed at top level"
 
-    return result
+    return funcs, result
 
 
 # returns environment after introducing all arguments
@@ -70,23 +86,40 @@ def arguments_to_env_and_info(
     typ = expr.typ
     last_spec: Spec | None = None
     last_size: Spec | None = None
+    ret_value: sp.Expr | None = None
+    env = VariableMap(env.copy())
 
     while True:
         match typ:
             case TFunc(ident, arg_type, ret, time):
                 match arg_type:
-                    case TRefinement(_, dtyp, _) | TBase(dtyp):
-                        assert isinstance(dtyp, DeltaInt), "non-int unimplemented"
+                    case TRefinement(_, dtype, _) | TBase(dtype):
+                        assert (
+                            isinstance(dtype, DeltaInt)
+                            or isinstance(dtype, DeltaParam)
+                            or isinstance(dtype, DeltaList)
+                            or isinstance(dtype, DeltaArray)
+                        ), f"dtype is {dtype}"
                         cur_var = create_fresh(f"{funcname}_{ident}")
                     case _:
                         assert False, "unimpl"
 
                 args.append(cur_var)
-                env = VariableMap(env.copy())
                 env[ident] = cur_var
                 last_spec = time.spec
                 last_size = time.size
                 typ = ret
+            case TRefinement(ident, _, spec):
+                match spec:
+                    case SPBinOp(SPBinOpKinds.EQ, SPVar(ident), right) | SPBinOp(
+                        SPBinOpKinds.EQ,
+                        SPMeasureCall(SPVar("len"), SPVar(ident)),
+                        right,
+                    ):
+                        ret_value = spec_to_expr(right, env)
+                    case _:
+                        pass
+                break
             case _:
                 break
 
@@ -94,7 +127,7 @@ def arguments_to_env_and_info(
     last_spec_expr = spec_to_expr(last_spec, env)
     last_size_expr = spec_to_expr(last_size, env)
 
-    info = FuncInfo(args, last_spec_expr, last_size_expr)
+    info = FuncInfo(args, ret_value, last_spec_expr, last_size_expr)
     return env, info
 
 
@@ -151,9 +184,8 @@ def spec_to_expr(spec: Spec, env: VariableMap) -> sp.Expr:
             return sp.log(spec_to_expr(body, env), 2)
         case SPForAll(_) | SPExists(_):
             assert False, "unimpl"
-        case SPMeasureCall(_):
-            # TODO: impl len at least
-            assert False, "unimpl"
+        case SPMeasureCall(SPVar("len"), body):
+            return spec_to_expr(body, env)
         case SPIte(cond, then, els):
             cond = spec_to_expr(cond, env)
             then = spec_to_expr(then, env)
@@ -175,8 +207,8 @@ def merge_product[T](xss: list[list[T]], yss: list[list[T]]) -> list[list[T]]:
 
 def cost_of_funccall(
     expr: EFuncCall, env: VariableMap, funcs: FuncDefs
-) -> list[list[FuncCall]]:
-    arg_values: list[sp.Expr | None] = []
+) -> tuple[sp.Expr | None, list[list[FuncCall]]]:
+    rev_arg_values: list[sp.Expr | None] = []
     cur: Expr = expr
     costs: list[list[FuncCall]] = [[]]
 
@@ -184,7 +216,7 @@ def cost_of_funccall(
         match cur:
             case EFuncCall(func, arg):
                 arg_value, arg_costs = expr_cost_spec(arg, env, funcs)
-                arg_values.append(arg_value)
+                rev_arg_values.append(arg_value)
                 costs = merge_product(costs, arg_costs)
                 cur = func
             case EVar(fname):
@@ -194,10 +226,23 @@ def cost_of_funccall(
             case _:
                 assert False, "unimpl"
 
-    assert len(args) == len(arg_values), "partial application not allowed"
-    argmap = FuncArgsMap({arg: value for arg, value in zip(args, arg_values)})
+    assert len(args) == len(rev_arg_values), "partial application not allowed"
+    argmap = FuncArgsMap(
+        {arg: value for arg, value in zip(args, reversed(rev_arg_values))}
+    )
     this_call = FuncCall(fname, argmap)
-    return merge_product([[this_call]], costs)
+
+    ret: sp.Expr | None = None
+    if info.ret is not None:
+        ret = info.ret
+        for arg, value in argmap.items():
+            if value is None:
+                value = None
+                break
+            else:
+                ret = ret.subs(arg, value)
+
+    return ret, merge_product([[this_call]], costs)
 
 
 def expr_cost_spec(
@@ -243,15 +288,50 @@ def expr_cost_spec(
             new_env[ident] = value_value
             body_value, body_costs = expr_cost_spec(body, new_env, funcs)
             costs = merge_product(value_costs, body_costs)
-            return body_value, body_costs
+            return body_value, costs
         case EFunc(_):
             assert False, "local functions not supported"
+        case EFuncCall(EVar("len"), body):
+            res = expr_cost_spec(body, env, funcs)
+            return res
         case EFuncCall(_):
-            return None, cost_of_funccall(expr, env, funcs)
-        case EMatch(_):
-            # TODO: match on len
-            assert False, "unimpl"
+            return cost_of_funccall(expr, env, funcs)
+        case EMatch(value, clauses):
+            value_value, value_costs = expr_cost_spec(value, env, funcs)
+            paths: list[list[FuncCall]] = []
+            for clause in clauses:
+                local_env = VariableMap(env.copy())
+                match clause.pat:
+                    case PCons(PVar(hd), PVar(tl)):
+                        local_env[hd] = None
+                        local_env[tl] = bind_opt(value_value, lambda x: x - 1)
+                    case PCons(PVar(hd1), PCons(PVar(hd2), PVar(tl))):
+                        local_env[hd1] = None
+                        local_env[hd2] = None
+                        local_env[tl] = bind_opt(value_value, lambda x: x - 2)
+                    case PVar(ident):
+                        local_env[ident] = value_value
+                    case _:
+                        pvars = get_all_pvars(clause.pat)
+                        for var in pvars:
+                            local_env[var] = None
+                _, local_costs = expr_cost_spec(clause.expr, local_env, funcs)
+                paths.extend(merge_product(value_costs, local_costs))
+            return None, paths
     assert False, f"{expr} is unmatched"
+
+
+def get_all_pvars(pat: Pattern) -> list[str]:
+    match pat:
+        case PVar(ident):
+            return [ident]
+        case PAny() | PInt(_) | PBool(_) | PNil():
+            return []
+        case PCons(hd, tl):
+            return get_all_pvars(hd) + get_all_pvars(tl)
+        case PPair(l, r):
+            return get_all_pvars(l) + get_all_pvars(r)
+    assert False, "unimpl"
 
 
 def eval_binop(

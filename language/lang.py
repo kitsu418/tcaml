@@ -159,6 +159,11 @@ class DeltaBool(DeltaType):
 
 
 @dataclass(frozen=True, slots=True, eq=True)
+class DeltaParam(DeltaType):
+    pass
+
+
+@dataclass(frozen=True, slots=True, eq=True)
 class DeltaTuple(DeltaType):
     types: list[DeltaType]
 

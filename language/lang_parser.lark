@@ -21,7 +21,7 @@ arg : "(" ident ":" type ")"
 args : arg+
 
 ?delta : delta1
-!delta_init : "()" | "int" | "bool" | "(" delta ")"
+!delta_init : "()" | "int" | "bool" | "'a" | "(" delta ")"
 !?delta0 : delta0 "list" | delta0 "array" | delta_init
 !?delta1 : delta0 ("*" delta0)*
 
@@ -31,17 +31,17 @@ args : arg+
       | "(" ident ":" type ")" "->" "(" type ")" "@" cspec
       | delta "->" delta
 
-!cspec : "O(" espec ")" "measure" espec
-       | espec "measure" espec
+!cspec : "O(" espec ")" "measure" "[" espec "]"
+       | espec "measure" "[" espec "]"
 
 ?espec : espec9
 
 !espec_init : ident | number | bool
             | "(" espec ")"
 
-!?espec0 : espec0 espec_init
-         | "not" espec_init
+!?espec0 : "not" espec_init
          | "log" espec_init
+         | espec0 espec_init
          | espec_init
 
 !?espec1 : espec0 "^" espec1
