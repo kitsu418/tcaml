@@ -172,7 +172,7 @@ def analyze_cli(file_or_dir: str | None, run_all: bool, output: str) -> None:
         click.echo("="*60)
         
         total_files = len(all_stats)
-        successful = len([r for r in all_stats if r["status"] == "verified"])
+        successful = len([r for r in all_stats if "status" in r and r["status"] == "verified"])
         failed = total_files - successful
         
         if successful > 0:
@@ -201,6 +201,7 @@ def analyze_cli(file_or_dir: str | None, run_all: bool, output: str) -> None:
             click.echo(f"  Average time per file: {avg_time:.3f}s")
             click.echo(f"  Parse time: {total_parse_time:.3f}s ({total_parse_time/total_time*100:.1f}%)")
             click.echo(f"  VC generation time: {total_vc_time:.3f}s ({total_vc_time/total_time*100:.1f}%)")
+            click.echo(f"  Verification time: {total_time - total_parse_time - total_vc_time:.3f}s ({(total_time - total_parse_time - total_vc_time)/total_time*100:.1f}%)")
             
             click.echo(f"\nAnalysis Results:")
             click.echo(f"  Total functions analyzed: {total_functions}")
@@ -220,6 +221,8 @@ def analyze_cli(file_or_dir: str | None, run_all: bool, output: str) -> None:
             for stats in all_stats:
                 if "error" in stats:
                     click.echo(f"  - {Path(stats['file']).name}: {stats['error']}")
+                elif stats.get("status") == "failed":
+                    click.echo(f"  - {Path(stats['file']).name}: Verification failed")
         
         # Save detailed results
         output_path = Path(output)
