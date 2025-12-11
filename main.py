@@ -39,7 +39,7 @@ def recurrences_cli(file: str) -> None:
 
     parsed_contents = parse(data)
     vcs = program_generate_vcs(parsed_contents)  # type: ignore
-    click.echo(vcs)
+    click.echo(vcs[1])
 
 
 def collect_benchmark(file_path: str) -> dict:
@@ -281,8 +281,12 @@ def analyze_cli(file_or_dir: str | None, run_all: bool, output: str) -> None:
 
     results = []
     for func_test in funcs:
-        results.append((func_test, verify_function(func_test, func_defs)))    
-    
+        try:
+            results.append((func_test, verify_function(func_test, func_defs)))    
+        except Exception as e:
+            results.append((func_test, False))
+            click.echo(f"Verification failed for function {func_test.name}: {e}")
+
     click.echo(f"\n=== Analysis Results ===\n")
     for (test, status) in results:
         click.echo(f"Function: {test.name}")
@@ -298,6 +302,7 @@ def analyze_cli(file_or_dir: str | None, run_all: bool, output: str) -> None:
                     click.echo(f"      - {call.func_name}(...)")
         else:
             click.echo("    (No function calls in this path)")
+
         click.echo(f"  Verification Status: {'VERIFIED' if status else 'FAILED'}\n")
         click.echo()
 

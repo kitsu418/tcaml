@@ -257,7 +257,15 @@ class Z3Translator:
             return factor
         
         ratio = sp.simplify(n_sub / n)
+        ratio_lim = sp.limit(n_sub / n, n, sp.oo)
+
+        if not ratio.is_Rational and ratio_lim.is_finite and n_sub < ratio_lim * n:
+            ratio = ratio_lim
+
         diff = sp.simplify(n - n_sub)
+        diff_lim = sp.limit(n - n_sub, n, sp.oo)
+        if not diff.is_Rational and diff_lim.is_finite and n_sub < n - diff_lim:
+            diff = diff_lim
 
         if factor == sp.log(n):
             if ratio.is_Rational and ratio > 0:
@@ -269,14 +277,14 @@ class Z3Translator:
 
         if factor.is_Pow:
             base, exp = factor.as_base_exp()
-            if exp == n and base.is_Number:
+            if base.is_Number:
                 if diff.is_Rational:
                     if diff > 0:
-                        k = 1 / diff
-                        if k.is_Integer and k > 0:
-                            return base**n / (base**k)
+                        return base**n / (base**diff)
                     else:
                         raise ValueError(f"Non-positive diff in substitution: {n_sub}")
+                else:
+                    raise ValueError(f"Non-rational diff in substitution: {n_sub}")
                     
         base, exp = factor.as_base_exp()
         if exp.is_Integer and exp >= 1:
@@ -334,7 +342,10 @@ class Z3Translator:
         result_terms = []
         coeffs = []
         product = list(itertools.product(*factor_chains))
-        product = sorted(product, key=lambda x: float(sp.Mul(*x).subs(self.n, 1000).evalf()))
+
+        dominant_term = positive_terms[0]
+        dominant_coeff = z3.Real(f"c_{self.func}_0")
+
         for combo in product:
             if apply_expr is not None:
                 new_combo = []
@@ -342,12 +353,19 @@ class Z3Translator:
                     new_factor = self._apply_n_sub_to_factor(factor, apply_expr)
                     new_combo.append(new_factor)
                 combo = new_combo
-            term = self.translate(sp.Mul(*combo))
+            term = sp.Mul(*combo)
+            term_z3 = self.translate(term)
             coeff = z3.Real(f"c_{self.func}_{len(result_terms)}")
             coeffs.append(coeff)
-            result_terms.append(coeff * term)
+            
+            ratio = sp.limit(term / dominant_term, self.n, sp.oo)
+            if ratio == sp.oo:
+                dominant_term = term
+                dominant_coeff = coeff
 
-        return z3.Sum(result_terms), coeffs
+            result_terms.append(coeff * term_z3)
+
+        return z3.Sum(result_terms), (coeffs, dominant_coeff)
     
     def _clone_for_call(self):
         clone = Z3Translator(func=self.func)

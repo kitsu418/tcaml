@@ -181,7 +181,7 @@ def spec_to_expr(spec: Spec, env: VariableMap) -> sp.Expr:
                 case SPBinOpKinds.OR:
                     return left | right
         case SPLog(body):
-            return sp.log(spec_to_expr(body, env), 2)
+            return sp.log(spec_to_expr(body, env))
         case SPForAll(_) | SPExists(_):
             assert False, "unimpl"
         case SPMeasureCall(SPVar("len"), body):

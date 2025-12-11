@@ -2,6 +2,55 @@ from verifier.vcgeneration import FunctionTest, FuncDefs
 from verifier.smt import Z3Translator
 import z3
 import sympy as sp
+import pprint
+
+def argument_domain_constraints(inequalities, translator: Z3Translator):
+    constraints = []
+    n = translator.n
+    n_interval = sp.Interval(-sp.oo, sp.oo)
+
+    for ineq in inequalities:
+        if ineq.has(n):
+            interval = sp.solveset(ineq, n, domain=sp.S.Reals)
+            n_interval = n_interval.intersect(interval)
+        else:
+            raise NotImplementedError(f"Only inequalities involving 'n' are supported in argument domain constraints. Unsupported inequality: {ineq}")
+    
+    n_z3 = z3.Real('n')
+    logn_z3 = translator.log_n_var
+    exps_z3 = translator.exp_vars
+    
+    if n_interval.start.is_finite:
+        lb = n_interval.start.evalf()
+        if n_interval.left_open:
+            constraints.append(n_z3 > lb)
+            if n_interval.start > 0:
+                constraints.append(logn_z3 > sp.log(n_interval.start, 2).evalf())
+            for base, exp_var in exps_z3.items():
+                constraints.append(exp_var > base ** lb)
+        else:
+            constraints.append(n_z3 >= lb)
+            if n_interval.start > 0:
+                constraints.append(logn_z3 >= sp.log(n_interval.start, 2).evalf())
+            for base, exp_var in exps_z3.items():
+                constraints.append(exp_var >= base ** lb)
+
+    if n_interval.end.is_finite:
+        ub = n_interval.end.evalf()
+        if n_interval.right_open:
+            constraints.append(n_z3 < ub)
+            if n_interval.end > 0:
+                constraints.append(logn_z3 < sp.log(n_interval.end, 2).evalf())
+            for base, exp_var in exps_z3.items():
+                constraints.append(exp_var < base ** ub)
+        else:
+            constraints.append(n_z3 <= ub)
+            if n_interval.end > 0:
+                constraints.append(logn_z3 <= sp.log(n_interval.end, 2).evalf())
+            for base, exp_var in exps_z3.items():
+                constraints.append(exp_var <= base ** ub)
+                
+    return z3.And(constraints)
 
 def verify_function(func_test: FunctionTest, funcs: FuncDefs) -> bool:
     translators = {}
@@ -13,6 +62,9 @@ def verify_function(func_test: FunctionTest, funcs: FuncDefs) -> bool:
     for path in func_test.paths:
         costs = []
         all_coeffs = set()
+        dominant_coeffs = set()
+        s = z3.Solver()
+        argument_constraints = []
 
         for call in path:
             if call.func_name not in funcs:
@@ -29,34 +81,40 @@ def verify_function(func_test: FunctionTest, funcs: FuncDefs) -> bool:
             
             # Substitute args into callee size expression
             size_in_n = main_translator._to_n_domain(callee_tr.get_n_sub_at_call(call.args))
-            s.add(callee_tr.translate(size_in_n) >= 0)
+
+            ineq = sp.Ge(size_in_n, 0)
+            if ineq.is_Relational:
+                argument_constraints.append(sp.Ge(size_in_n, 0))
             
             # Decompose cost
-            cost_z3, coeffs = callee_tr.decompose_to_linear_combination(callee_tr.cost_expr, size_in_n)
+            cost_z3, (spec_coeffs, dominant_coeff) = callee_tr.decompose_to_linear_combination(callee_tr.cost_expr, size_in_n)
             costs.append(cost_z3)
-            all_coeffs.update(coeffs)
+            all_coeffs.update(spec_coeffs)
+            dominant_coeffs.add(dominant_coeff)
             
         # Main spec cost (RHS)
-        spec_z3, spec_coeffs = main_translator.decompose_to_linear_combination(main_translator.cost_expr)
+        spec_z3, (spec_coeffs, dominant_coeff) = main_translator.decompose_to_linear_combination(main_translator.cost_expr)
         all_coeffs.update(spec_coeffs)
+        dominant_coeffs.add(dominant_coeff)
 
-        s = z3.Solver()
         n_z3 = z3.Real('n')
-        
-        o1 = z3.Real('const')
-        s.add(o1 > 0)
+        const = z3.Real('const')
+        s.add(const > 0)
 
         lhs = z3.Sum(costs) if costs else z3.RealVal(0)
-        lhs += o1
+        lhs += const
         rhs = spec_z3
 
         vars = list(main_translator.exp_vars.values()) + [main_translator.log_n_var] + [n_z3]
-        domain = z3.And([v >= 0 for v in vars])
+        domain = z3.And([v >= 0 for v in vars]) & argument_domain_constraints(argument_constraints, main_translator)
         
         s.add(z3.ForAll(vars, z3.Implies(domain, lhs <= rhs)))
         
         for coeff in all_coeffs:
-            s.add(coeff > 0)
+            if coeff in dominant_coeffs:
+                s.add(coeff > 0)
+            else:
+                s.add(coeff >= 0)
         
         if s.check() != z3.sat:
             return False
