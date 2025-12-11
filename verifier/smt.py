@@ -343,8 +343,8 @@ class Z3Translator:
         coeffs = []
         product = list(itertools.product(*factor_chains))
 
-        dominant_term = positive_terms[0]
-        dominant_coeff = z3.Real(f"c_{self.func}_0")
+        dominant_term = None
+        dominant_coeff = None
 
         for combo in product:
             if apply_expr is not None:
@@ -353,13 +353,18 @@ class Z3Translator:
                     new_factor = self._apply_n_sub_to_factor(factor, apply_expr)
                     new_combo.append(new_factor)
                 combo = new_combo
+
             term = sp.Mul(*combo)
             term_z3 = self.translate(term)
             coeff = z3.Real(f"c_{self.func}_{len(result_terms)}")
             coeffs.append(coeff)
             
-            ratio = sp.limit(term / dominant_term, self.n, sp.oo)
-            if ratio == sp.oo:
+            if dominant_term:
+                ratio = sp.limit(term / dominant_term, self.n, sp.oo)
+                if ratio == sp.oo:
+                    dominant_term = term
+                    dominant_coeff = coeff
+            else:
                 dominant_term = term
                 dominant_coeff = coeff
 
