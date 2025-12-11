@@ -1,10 +1,10 @@
-let rec split1 (l : int list) : int list @ O(len l) measure [len l] =
+let rec split1 (l : int list) : {v: int list | len v = len l / 2} @ O(len l) measure [len l] =
   match l with
   | [] -> []
   | x :: [] -> x :: []
   | x :: _ :: zs -> x :: split1 zs;
 
-let rec split2 (l : int list) : int list @ O(len l) measure [len l] =
+let rec split2 (l : int list) : {v: int list | len v = len l / 2} @ O(len l) measure [len l] =
   match l with
   | [] -> []
   | _ :: [] -> []
