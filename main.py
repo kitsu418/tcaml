@@ -5,6 +5,7 @@ from pathlib import Path
 
 from language.lang_parser import parse
 from verifier.vcgeneration import program_generate_vcs
+from verifier.verification import verify_function
 
 
 @click.group()
@@ -69,7 +70,7 @@ def collect_benchmark(file_path: str) -> dict:
     # VC generation phase
     vc_start = time.time()
     try:
-        results = program_generate_vcs(parsed)
+        (func_defs, funcs) = program_generate_vcs(parsed)
         vc_time = time.time() - vc_start
     except Exception as e:
         return {
@@ -79,18 +80,35 @@ def collect_benchmark(file_path: str) -> dict:
             "vc_generation_time": time.time() - vc_start
         }
     
+    # Verification phase
+    verification_start = time.time()
+    try:
+        verification_results = []
+        for func_test in funcs:
+            verification_results.append((func_test, verify_function(func_test, func_defs)))
+
+        verification_time = time.time() - verification_start
+    except Exception as e:
+        return {
+            "file": file_path,
+            "error": f"Verification failed: {str(e)}",
+            "parse_time": parse_time,
+            "verification_time": time.time() - verification_start
+        }
+    
     total_time = time.time() - start_time
     
     stats = {
         "file": file_path,
         "parse_time": parse_time,
         "vc_generation_time": vc_time,
+        "verification_time": verification_time,
         "total_time": total_time,
-        "num_functions": len(results),
+        "num_functions": len(verification_results),
         "functions": []
     }
     
-    for test in results:
+    for (test, status) in verification_results:
         func_stats = {
             "name": test.name,
             "num_paths": len(test.paths),
@@ -98,6 +116,7 @@ def collect_benchmark(file_path: str) -> dict:
             "max_path_length": max(len(path) for path in test.paths) if test.paths else 0,
             "min_path_length": min(len(path) for path in test.paths) if test.paths else 0,
             "avg_path_length": sum(len(path) for path in test.paths) / len(test.paths) if test.paths else 0,
+            "status": "verified" if status else "failed"
         }
         stats["functions"].append(func_stats)
     
@@ -258,10 +277,14 @@ def analyze_cli(file_or_dir: str | None, run_all: bool, output: str) -> None:
         return
 
     parsed_contents = parse(data)
-    results = program_generate_vcs(parsed_contents)  # type: ignore
+    (func_defs, funcs) = program_generate_vcs(parsed_contents)
+
+    results = []
+    for func_test in funcs:
+        results.append((func_test, verify_function(func_test, func_defs)))    
     
     click.echo(f"\n=== Analysis Results ===\n")
-    for test in results:
+    for (test, status) in results:
         click.echo(f"Function: {test.name}")
         click.echo(f"  Time Complexity Claim: {test.info.timespec}")
         click.echo(f"  Size Parameter: {test.info.size}")
@@ -275,6 +298,7 @@ def analyze_cli(file_or_dir: str | None, run_all: bool, output: str) -> None:
                     click.echo(f"      - {call.func_name}(...)")
         else:
             click.echo("    (No function calls in this path)")
+        click.echo(f"  Verification Status: {'VERIFIED' if status else 'FAILED'}\n")
         click.echo()
 
 
