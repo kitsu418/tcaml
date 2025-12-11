@@ -1,0 +1,66 @@
+digraph TCamlArchitecture {
+    rankdir=LR;
+    nodesep=0.6;
+    ranksep=0.6;
+    
+    node [
+        shape=box, 
+        style="filled,rounded", 
+        fillcolor="#E0E0E0",
+        fontname="Helvetica", 
+        fontsize=11, 
+        height=0.6, 
+        penwidth=0
+    ];
+    
+    node [group=artifacts]; 
+    
+    edge [fontname="Helvetica", fontsize=9, color="#424242"];
+
+    // --- 1. Frontend Module ---
+    subgraph cluster_frontend {
+        label = "Frontend";
+        style = filled; color = "#E3F2FD"; fontcolor="#0D47A1"; fontname="Helvetica";
+        margin = 15;
+
+        Parser [label="Parser", fillcolor="#90CAF9", fontcolor="#0D47A1"];
+        
+        AST [label="Typed AST", style="filled,rounded,dashed", fillcolor="white", color="#1565C0", penwidth=1.5];
+        
+        Parser -> AST;
+    }
+
+    // --- 2. Analysis Module ---
+    subgraph cluster_analysis {
+        label = "Analysis Engine";
+        style = filled; color = "#F3E5F5"; fontcolor="#4A148C"; fontname="Helvetica";
+        margin = 15;
+
+        Analyzer [label="Path & Cost\nAnalyzer", fillcolor="#CE93D8", fontcolor="#4A148C"];
+        
+        FuncTests [label="Function Tests\n(Paths + Costs)", style="filled,rounded,dashed", fillcolor="white", color="#7B1FA2", penwidth=1.5];
+        
+        Analyzer -> FuncTests;
+    }
+
+    // --- 3. Verification Module ---
+    subgraph cluster_verification {
+        label = "Verification Engine";
+        style = filled; color = "#E8F5E9"; fontcolor="#1B5E20"; fontname="Helvetica";
+        margin = 15;
+
+        VCGen [label="VC Generator", fillcolor="#A5D6A7", fontcolor="#1B5E20"];
+        
+        Z3 [label="SMT Solver\n(Z3)", shape=component, style="filled", fillcolor="#FFCC80", color="#E65100", penwidth=0, ];
+
+        VCGen -> Z3;
+    }
+
+    Source [label="Source Code", shape=note, style="filled", fillcolor="#FFF9C4", color="#FBC02D", penwidth=1];
+    Result [label="Verification\nResult", shape=note, style="filled", fillcolor="#FFF9C4", color="#FBC02D", penwidth=1];
+
+    Source -> Parser;
+    AST -> Analyzer;
+    FuncTests -> VCGen;
+    Z3 -> Result;
+}
