@@ -2,7 +2,6 @@ from verifier.vcgeneration import FunctionTest, FuncDefs
 from verifier.smt import Z3Translator
 import z3
 import sympy as sp
-import pprint
 
 def argument_domain_constraints(inequalities, translator: Z3Translator):
     constraints = []
@@ -81,6 +80,9 @@ def verify_function(func_test: FunctionTest, funcs: FuncDefs) -> bool:
             
             # Substitute args into callee size expression
             size_in_n = main_translator._to_n_domain(callee_tr.get_n_sub_at_call(call.args))
+
+            if not size_in_n.has(main_translator.n):
+                raise NotImplementedError("Multiple input sizes is not supported.")
 
             ineq = sp.Ge(size_in_n, 0)
             if ineq.is_Relational:
