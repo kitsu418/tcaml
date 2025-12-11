@@ -100,6 +100,7 @@ def verify_function(func_test: FunctionTest, funcs: FuncDefs) -> bool:
         dominant_coeffs.add(dominant_coeff)
 
         n_z3 = z3.Real('n')
+        logn_z3 = main_translator.log_n_var
         const = z3.Real('const')
         s.add(const > 0)
 
@@ -108,7 +109,18 @@ def verify_function(func_test: FunctionTest, funcs: FuncDefs) -> bool:
         rhs = spec_z3
 
         vars = list(main_translator.exp_vars.values()) + [main_translator.log_n_var] + [n_z3]
-        domain = z3.And([v >= 0 for v in vars]) & argument_domain_constraints(argument_constraints, main_translator)
+        domain = z3.And([v >= 0 for v in vars])
+        domain = z3.And(domain, logn_z3 < n_z3)
+
+        for base, exp_var in main_translator.exp_vars.items():
+            if base < 2:
+                raise ValueError("Exponential base must be greater than or equal to 2.")
+            else:
+                domain = z3.And(domain, exp_var > n_z3)
+        
+        if argument_constraints:
+            domain = z3.And(domain, 
+                            argument_domain_constraints(argument_constraints, main_translator))
         
         s.add(z3.ForAll(vars, z3.Implies(domain, lhs <= rhs)))
         

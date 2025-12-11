@@ -108,6 +108,7 @@ def collect_benchmark(file_path: str) -> dict:
         "functions": []
     }
     
+    verified = True
     for (test, status) in verification_results:
         func_stats = {
             "name": test.name,
@@ -119,7 +120,10 @@ def collect_benchmark(file_path: str) -> dict:
             "status": "verified" if status else "failed"
         }
         stats["functions"].append(func_stats)
+        if not status:
+            verified = False
     
+    stats["status"] = "verified" if verified else "failed"
     return stats
 
 
@@ -151,8 +155,10 @@ def analyze_cli(file_or_dir: str | None, run_all: bool, output: str) -> None:
                 
                 if "error" in stats:
                     click.echo(f" ERROR: {stats['error']}")
-                else:
+                elif stats["status"] == "verified":
                     click.echo(f" ✓ ({stats['total_time']:.3f}s)")
+                else:
+                    click.echo(f" ✗ ({stats['total_time']:.3f}s)")
             except Exception as e:
                 click.echo(f" EXCEPTION: {e}")
                 all_stats.append({
@@ -166,7 +172,7 @@ def analyze_cli(file_or_dir: str | None, run_all: bool, output: str) -> None:
         click.echo("="*60)
         
         total_files = len(all_stats)
-        successful = len([r for r in all_stats if "error" not in r])
+        successful = len([r for r in all_stats if r["status"] == "verified"])
         failed = total_files - successful
         
         if successful > 0:
@@ -240,8 +246,10 @@ def analyze_cli(file_or_dir: str | None, run_all: bool, output: str) -> None:
                 
                 if "error" in stats:
                     click.echo(f" ERROR: {stats['error']}")
-                else:
+                elif stats['status'] == "verified":
                     click.echo(f" ✓ ({stats['total_time']:.3f}s)")
+                else:
+                    click.echo(f" ✗ ({stats['total_time']:.3f}s)")
             except Exception as e:
                 click.echo(f" EXCEPTION: {e}")
                 all_stats.append({
@@ -250,7 +258,7 @@ def analyze_cli(file_or_dir: str | None, run_all: bool, output: str) -> None:
                 })
         
         # Print summary (simplified)
-        successful = len([r for r in all_stats if "error" not in r])
+        successful = len([r for r in all_stats if "status" in r and r['status'] == "verified"])
         total_time = sum(r.get("total_time", 0) for r in all_stats if "error" not in r)
         click.echo(f"\n✓ Processed {successful}/{len(all_stats)} files in {total_time:.3f}s")
         
