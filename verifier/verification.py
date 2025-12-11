@@ -49,8 +49,11 @@ def verify_function(func_test: FunctionTest, funcs: FuncDefs) -> bool:
         lhs = z3.Sum(costs) if costs else z3.RealVal(0)
         lhs += o1
         rhs = spec_z3
+
+        vars = list(main_translator.exp_vars.values()) + [main_translator.log_n_var] + [n_z3]
+        domain = z3.And([v >= 0 for v in vars])
         
-        s.add(z3.ForAll([n_z3], z3.Implies(n_z3 >= 0, lhs <= rhs)))
+        s.add(z3.ForAll(vars, z3.Implies(domain, lhs <= rhs)))
         
         for coeff in all_coeffs:
             s.add(coeff > 0)
